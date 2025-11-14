@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Indonesia - Meta Real Estate</title>
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&display=swap');
+      
+    /* ========== GLOBAL RESET & BASE STYLES ========== */
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: 'Rajdhani', sans-serif;
+      background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 50%, #f0f4f8 100%);
+      color: #2c3e50;
+      min-height: 100vh;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: 
+        radial-gradient(circle at 20% 50%, rgba(212, 175, 55, 0.15) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(184, 134, 11, 0.12) 0%, transparent 50%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .page {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 20px 20px 60px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ========== NAVIGATION ========== */
+    .back-link {
+      display: inline-block;
+      margin-bottom: 20px;
+      color: #b8860b;
+      text-decoration: none;
+      font-size: 16px;
+      transition: all 0.3s;
+      padding: 8px 16px;
+      border: 2px solid rgba(212, 175, 55, 0.4);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.8);
+    }
+
+    .back-link:hover {
+      background: rgba(255, 255, 255, 0.95);
+      transform: translateX(-5px);
+      box-shadow: 0 4px 12px rgba(212, 175, 55, 0.2);
+    }
+
+    /* ========== HEADER SECTION ========== */
+    .header {
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(250, 248, 245, 0.98) 100%);
+      border: 2px solid rgba(212, 175, 55, 0.4);
+      border-radius: 24px;
+      padding: 32px 20px;
+      margin: 20px 0 40px;
+      text-align: center;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1), 0 0 40px rgba(212, 175, 55, 0.2);
+      backdrop-filter: blur(10px);
+    }
+
+    .header h1 {
+      margin: 0;
+      font-family: 'Orbitron', sans-serif;
+      font-size: clamp(28px, 5vw, 48px);
+      font-weight: 900;
+      letter-spacing: 3px;
+      background: linear-gradient(135deg, #d4af37 0%, #f4d03f 50%, #d4af37 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* ========== FORM CONTAINER ========== */
+    .form-container {
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(250, 248, 245, 0.98) 100%);
+      border: 2px solid rgba(212, 175, 55, 0.4);
+      border-radius: 24px;
+      padding: 40px 32px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+      backdrop-filter: blur(10px);
+    }
+
+    /* ========== FORM ELEMENTS ========== */
+    .form-group {
+      margin-bottom: 28px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 10px;
+      font-size: 18px;
+      font-weight: 600;
+      color: #b8860b;
+      letter-spacing: 1px;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100%;
+      padding: 14px 18px;
+      background: rgba(255, 255, 255, 0.9);
+      border: 2px solid rgba(212, 175, 55, 0.3);
+      border-radius: 12px;
+      color: #2c3e50;
+      font-size: 16px;
+      font-family: 'Rajdhani', sans-serif;
+      transition: all 0.3s;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: rgba(212, 175, 55, 0.7);
+      box-shadow: 0 0 20px rgba(212, 175, 55, 0.3);
+      background: rgba(255, 255, 255, 1);
+    }
+
+    .form-group textarea {
+      min-height: 100px;
+      resize: vertical;
+    }
+
+    /* ========== RADIO & CHECKBOX GROUPS ========== */
+    .radio-group,
+    .checkbox-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-top: 12px;
+    }
+
+    .radio-option,
+    .checkbox-option {
+      display: flex;
+      align-items: center;
+      padding: 12px 20px;
+      background: rgba(255, 250, 240, 0.9);
+      border: 2px solid rgba(212, 175, 55, 0.3);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.3s;
+      flex: 1;
+      min-width: 150px;
+    }
+
+    .radio-option:hover,
+    .checkbox-option:hover {
+      background: rgba(255, 255, 255, 1);
+      border-color: rgba(212, 175, 55, 0.5);
+      transform: translateY(-2px);
+    }
+
+    .radio-option input[type="radio"],
+    .checkbox-option input[type="checkbox"] {
+      width: auto;
+      margin-right: 10px;
+      cursor: pointer;
+    }
+
+    /* ========== RANGE INPUTS (Price, SQM) ========== */
+    .range-group {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+    }
+
+    .range-group input {
+      flex: 1;
+    }
+
+    .range-group span {
+      color: #5d6d7e;
+      font-weight: 600;
+      min-width: 80px;
+      text-align: center;
+    }
+
+    /* ========== SUBMIT BUTTON ========== */
+    .submit-btn {
+      width: 100%;
+      padding: 18px;
+      background: linear-gradient(135deg, #d4af37 0%, #f4d03f 100%);
+      border: none;
+      border-radius: 12px;
+      color: #0a0e27;
+      font-size: 20px;
+      font-weight: 700;
+      font-family: 'Orbitron', sans-serif;
+      letter-spacing: 2px;
+      cursor: pointer;
+      transition: all 0.3s;
+      text-transform: uppercase;
+      box-shadow: 0 4px 20px rgba(212, 175, 55, 0.4);
+    }
+
+    .submit-btn:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 30px rgba(212, 175, 55, 0.6);
+      background: linear-gradient(135deg, #f4d03f 0%, #d4af37 100%);
+    }
+
+    /* ========== FOOTER ========== */
+    footer {
+      margin-top: 50px;
+      text-align: center;
+      padding: 20px;
+      font-size: 14px;
+      color: #5d6d7e;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(250, 248, 245, 0.95) 100%);
+      border-radius: 16px;
+      border: 2px solid rgba(212, 175, 55, 0.3);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    }
+
+    /* ========== RESPONSIVE DESIGN ========== */
+    @media (max-width: 600px) {
+      .form-container { padding: 24px 20px; }
+      .range-group { flex-direction: column; gap: 12px; }
+      .radio-group,
+      .checkbox-group { flex-direction: column; }
+    }
+    </style>
+</head>
+<body>
+  <div class="page">
+    <!-- Back Navigation -->
+    <a href="realestate.html" class="back-link">← Back to Home</a>
+    
+    <!-- Page Header -->
+    <header class="header">
+      <h1>INDONESIA REAL ESTATE</h1>
+    </header>
+
+    <!-- Main Form Container -->
+    <div class="form-container">
+      <form id="indonesiaForm" onsubmit="handleSubmit(event)">
+        
+        <!-- User Type Selection (Buyer/Seller/Investor/Renter) -->
+        <div class="form-group">
+          <label>What are you looking for? *</label>
+          <div class="radio-group">
+            <label class="radio-option">
+              <input type="radio" name="userType" value="buyer" required> Buyer
+            </label>
+            <label class="radio-option">
+              <input type="radio" name="userType" value="seller" required> Seller
+            </label>
+            <label class="radio-option">
+              <input type="radio" name="userType" value="investor" required> Investor
+            </label>
+            <label class="radio-option">
+              <input type="radio" name="userType" value="renter" required> Renter
+            </label>
+          </div>
+        </div>
+
+        <!-- Property Type Selection -->
+        <div class="form-group">
+          <label>Property Type *</label>
+          <div class="checkbox-group">
+            <label class="checkbox-option">
+              <input type="checkbox" name="propertyType" value="apartment"> Apartment
+            </label>
+            <label class="checkbox-option">
+              <input type="checkbox" name="propertyType" value="house"> House
+            </label>
+            <label class="checkbox-option">
+              <input type="checkbox" name="propertyType" value="villa"> Villa
+            </label>
+            <label class="checkbox-option">
+              <input type="checkbox" name="propertyType" value="commercial"> Commercial
+            </label>
+            <label class="checkbox-option">
+              <input type="checkbox" name="propertyType" value="land"> Land
+            </label>
+          </div>
+        </div>
+
+        <!-- Area/Region Selection -->
+        <div class="form-group">
+          <label>Specific Area in Indonesia *</label>
+          <select name="area" required>
+            <option value="">Select an area</option>
+            <option value="jakarta">Jakarta</option>
+            <option value="surabaya">Surabaya</option>
+            <option value="bandung">Bandung</option>
+            <option value="medan">Medan</option>
+            <option value="semarang">Semarang</option>
+            <option value="makassar">Makassar</option>
+            <option value="palembang">Palembang</option>
+            <option value="tangerang">Tangerang</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+
+        <!-- City/Area -->
+        <div class="form-group">
+          <label>City/Area</label>
+          <input type="text" name="city" placeholder="Enter city or area">
+        </div>
+
+        <!-- Price Range -->
+        <div class="form-group">
+          <label>Price Range (IDR) *</label>
+          <div class="range-group">
+            <input type="number" name="minPrice" placeholder="Min Price" min="0" required>
+            <span>to</span>
+            <input type="number" name="maxPrice" placeholder="Max Price" min="0" required>
+          </div>
+        </div>
+
+        <!-- Square Meter Range -->
+        <div class="form-group">
+          <label>Square Meter Range (m²) *</label>
+          <div class="range-group">
+            <input type="number" name="minSqm" placeholder="Min m²" min="0" required>
+            <span>to</span>
+            <input type="number" name="maxSqm" placeholder="Max m²" min="0" required>
+          </div>
+        </div>
+
+        <!-- Bedrooms -->
+        <div class="form-group">
+          <label>Number of Bedrooms</label>
+          <select name="bedrooms">
+            <option value="">Any</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5+">5+</option>
+          </select>
+        </div>
+
+        <!-- Bathrooms -->
+        <div class="form-group">
+          <label>Number of Bathrooms</label>
+          <select name="bathrooms">
+            <option value="">Any</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4+">4+</option>
+          </select>
+        </div>
+
+        <!-- Additional Notes -->
+        <div class="form-group">
+          <label>Additional Requirements or Notes</label>
+          <textarea name="notes" placeholder="Tell us more about what you're looking for..."></textarea>
+        </div>
+
+        <!-- Contact Email -->
+        <div class="form-group">
+          <label>Contact Email *</label>
+          <input type="email" name="email" placeholder="your.email@example.com" required>
+        </div>
+
+        <!-- Contact Phone -->
+        <div class="form-group">
+          <label>Contact Phone</label>
+          <input type="tel" name="phone" placeholder="+62 XXX-XXXX-XXXX">
+        </div>
+
+        <!-- Submit Button -->
+        <button type="submit" class="submit-btn">Submit Request</button>
+      </form>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      Copyright &copy; MRE
+    </footer>
+  </div>
+
+  <!-- Form Submission Handler -->
+  <script>
+    function handleSubmit(event) {
+      event.preventDefault();
+      const formData = new FormData(event.target);
+      const data = Object.fromEntries(formData);
+      
+      // Collect checkbox values
+      data.propertyType = Array.from(event.target.querySelectorAll('input[name="propertyType"]:checked')).map(cb => cb.value);
+      
+      console.log('Form submitted:', data);
+      alert('Thank you! Your request has been submitted. We will contact you soon.');
+      event.target.reset();
+    }
+  </script>
+</body>
+</html>
