@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>More Communities - Meta Real Estate</title>
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&display=swap');
+      
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: 'Rajdhani', sans-serif;
+      background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 50%, #f0f4f8 100%);
+      color: #2c3e50;
+      min-height: 100vh;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: 
+        radial-gradient(circle at 20% 50%, rgba(212, 175, 55, 0.15) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(184, 134, 11, 0.12) 0%, transparent 50%),
+        radial-gradient(circle at 40% 20%, rgba(139, 69, 19, 0.1) 0%, transparent 50%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .page {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px 20px 60px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .header {
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(250, 248, 245, 0.98) 100%);
+      border: 2px solid rgba(212, 175, 55, 0.4);
+      border-radius: 24px;
+      padding: 32px 20px;
+      margin: 20px 0 40px;
+      text-align: center;
+      box-shadow: 
+        0 8px 32px rgba(0, 0, 0, 0.1),
+        0 0 40px rgba(212, 175, 55, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.8);
+      backdrop-filter: blur(10px);
+    }
+
+    .header h1 {
+      margin: 0;
+      font-family: 'Orbitron', sans-serif;
+      font-size: clamp(32px, 5vw, 56px);
+      font-weight: 900;
+      letter-spacing: 4px;
+      background: linear-gradient(135deg, #d4af37 0%, #f4d03f 50%, #d4af37 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .back-link {
+      display: inline-block;
+      margin-bottom: 20px;
+      color: #b8860b;
+      text-decoration: none;
+      font-size: 16px;
+      transition: all 0.3s;
+      padding: 8px 16px;
+      border: 2px solid rgba(212, 175, 55, 0.4);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.8);
+    }
+
+    .back-link:hover {
+      background: rgba(255, 255, 255, 0.95);
+      transform: translateX(-5px);
+      box-shadow: 0 4px 12px rgba(212, 175, 55, 0.2);
+    }
+
+    .countries-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 24px;
+      margin-top: 40px;
+    }
+
+    .country-item {
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(250, 248, 245, 0.98) 100%);
+      border: 2px solid rgba(212, 175, 55, 0.3);
+      border-radius: 16px;
+      padding: 20px;
+      text-align: center;
+      transition: all 0.3s;
+      text-decoration: none;
+      color: #2c3e50;
+      display: block;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    }
+
+    .country-item:hover {
+      transform: translateY(-8px);
+      border-color: rgba(212, 175, 55, 0.6);
+      box-shadow: 
+        0 8px 32px rgba(0, 0, 0, 0.12),
+        0 0 40px rgba(212, 175, 55, 0.25);
+      background: linear-gradient(135deg, rgba(255, 255, 255, 1) 0%, rgba(255, 250, 240, 1) 100%);
+    }
+
+    .country-item h3 {
+      margin: 0 0 12px 0;
+      font-size: 20px;
+      color: #b8860b;
+      font-weight: 600;
+    }
+
+    .country-item img {
+      width: 100%;
+      height: 120px;
+      object-fit: cover;
+      border-radius: 12px;
+      margin-bottom: 12px;
+      border: 1px solid rgba(212, 175, 55, 0.2);
+    }
+
+    footer {
+      margin-top: 50px;
+      text-align: center;
+      padding: 20px;
+      font-size: 14px;
+      color: #5d6d7e;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(250, 248, 245, 0.95) 100%);
+      border-radius: 16px;
+      border: 2px solid rgba(212, 175, 55, 0.3);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    }
+    </style>
+</head>
+<body>
+  <div class="page">
+    <a href="realestate.html" class="back-link">← Back to Home</a>
+    
+    <header class="header">
+      <h1>ALL COMMUNITIES</h1>
+    </header>
+
+    <div class="countries-grid">
+      <a href="lebanon.html" class="country-item">
+        <img src="Lb.jpg" alt="Lebanon" />
+        <h3>Lebanon</h3>
+      </a>
+
+      <a href="usa.html" class="country-item">
+        <img src="US.jpg" alt="United States" />
+        <h3>United States</h3>
+      </a>
+
+      <a href="spain.html" class="country-item">
+        <img src="spain.jpg" alt="Spain" />
+        <h3>Spain</h3>
+      </a>
+
+      <a href="australia.html" class="country-item">
+        <img src="Aust.jpg" alt="Australia" />
+        <h3>Australia</h3>
+      </a>
+
+      <a href="france.html" class="country-item">
+        <div style="width: 100%; height: 120px; background: linear-gradient(90deg, #002654 0%, #002654 33%, #ffffff 33%, #ffffff 66%, #ED2939 66%, #ED2939 100%); border-radius: 12px; margin-bottom: 12px;"></div>
+        <h3>France</h3>
+      </a>
+
+      <a href="uk.html" class="country-item">
+        <div style="width: 100%; height: 120px; background: linear-gradient(180deg, #012169 0%, #012169 50%, #FFFFFF 50%, #FFFFFF 100%), linear-gradient(90deg, #012169 0%, #012169 33%, #FFFFFF 33%, #FFFFFF 66%, #C8102E 66%, #C8102E 100%); border-radius: 12px; margin-bottom: 12px;"></div>
+        <h3>United Kingdom</h3>
+      </a>
+
+      <a href="canada.html" class="country-item">
+        <div style="width: 100%; height: 120px; background: linear-gradient(90deg, #FF0000 0%, #FF0000 25%, #FFFFFF 25%, #FFFFFF 75%, #FF0000 75%, #FF0000 100%); border-radius: 12px; margin-bottom: 12px;"></div>
+        <h3>Canada</h3>
+      </a>
+
+      <a href="germany.html" class="country-item">
+        <div style="width: 100%; height: 120px; background: linear-gradient(180deg, #000000 0%, #000000 33%, #DD0000 33%, #DD0000 66%, #FFCE00 66%, #FFCE00 100%); border-radius: 12px; margin-bottom: 12px;"></div>
+        <h3>Germany</h3>
+      </a>
+
+      <a href="italy.html" class="country-item">
+        <div style="width: 100%; height: 120px; background: linear-gradient(90deg, #009246 0%, #009246 33%, #FFFFFF 33%, #FFFFFF 66%, #CE2B37 66%, #CE2B37 100%); border-radius: 12px; margin-bottom: 12px;"></div>
+        <h3>Italy</h3>
+      </a>
+
+      <a href="japan.html" class="country-item">
+        <div style="width: 100%; height: 120px; background: #FFFFFF; border-radius: 12px; margin-bottom: 12px; display: flex; align-items: center; justify-content: center;">
+          <div style="width: 60px; height: 60px; background: #BC002D; border-radius: 50%;"></div>
+        </div>
+        <h3>Japan</h3>
+      </a>
+
+      <a href="uae.html" class="country-item">
+        <div style="width: 100%; height: 120px; background: linear-gradient(180deg, #FF0000 0%, #FF0000 25%, #000000 25%, #000000 50%, #FFFFFF 50%, #FFFFFF 75%, #00FF00 75%, #00FF00 100%); border-radius: 12px; margin-bottom: 12px;"></div>
+        <h3>United Arab Emirates</h3>
+      </a>
+
+      <a href="singapore.html" class="country-item">
+        <div style="width: 100%; height: 120px; background: linear-gradient(180deg, #ED2939 0%, #ED2939 50%, #FFFFFF 50%, #FFFFFF 100%); border-radius: 12px; margin-bottom: 12px;"></div>
+        <h3>Singapore</h3>
+      </a>
+
+      <a href="portugal.html" class="country-item">
+        <div style="width: 100%; height: 120px; background: linear-gradient(180deg, #006600 0%, #006600 50%, #FF0000 50%, #FF0000 100%); border-radius: 12px; margin-bottom: 12px;"></div>
+        <h3>Portugal</h3>
+      </a>
+
+      <a href="greece.html" class="country-item">
+        <div style="width: 100%; height: 120px; background: linear-gradient(180deg, #0D5EAF 0%, #0D5EAF 33%, #FFFFFF 33%, #FFFFFF 66%, #0D5EAF 66%, #0D5EAF 100%); border-radius: 12px; margin-bottom: 12px;"></div>
+        <h3>Greece</h3>
+      </a>
+
+      <a href="turkey.html" class="country-item">
+        <div style="width: 100%; height: 120px; background: linear-gradient(180deg, #E30A17 0%, #E30A17 50%, #FFFFFF 50%, #FFFFFF 100%); border-radius: 12px; margin-bottom: 12px; position: relative;">
+          <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 40px; height: 40px; background: #E30A17; border-radius: 50%; border: 3px solid #FFFFFF;"></div>
+        </div>
+        <h3>Turkey</h3>
+      </a>
+
+      <a href="switzerland.html" class="country-item">
+        <div style="width: 100%; height: 120px; background: #FF0000; border-radius: 12px; margin-bottom: 12px; display: flex; align-items: center; justify-content: center;">
+          <div style="width: 50px; height: 50px; background: #FFFFFF; border-radius: 8px;"></div>
+        </div>
+        <h3>Switzerland</h3>
+      </a>
+
+      <a href="netherlands.html" class="country-item">
+        <div style="width: 100%; height: 120px; background: linear-gradient(180deg, #AE1C28 0%, #AE1C28 33%, #FFFFFF 33%, #FFFFFF 66%, #21468B 66%, #21468B 100%); border-radius: 12px; margin-bottom: 12px;"></div>
+        <h3>Netherlands</h3>
+      </a>
+
+      <a href="belgium.html" class="country-item">
+        <div style="width: 100%; height: 120px; background: linear-gradient(90deg, #000000 0%, #000000 33%, #FAE042 33%, #FAE042 66%, #ED2939 66%, #ED2939 100%); border-radius: 12px; margin-bottom: 12px;"></div>
+        <h3>Belgium</h3>
+      </a>
+
+      <a href="sweden.html" class="country-item">
+        <div style="width: 100%; height: 120px; background: linear-gradient(180deg, #006AA7 0%, #006AA7 40%, #FECC00 40%, #FECC00 60%, #006AA7 60%, #006AA7 100%); border-radius: 12px; margin-bottom: 12px;"></div>
+        <h3>Sweden</h3>
+      </a>
+
+      <a href="norway.html" class="country-item">
+        <div style="width: 100%; height: 120px; background: linear-gradient(180deg, #BA0C2F 0%, #BA0C2F 40%, #FFFFFF 40%, #FFFFFF 50%, #00205B 50%, #00205B 60%, #FFFFFF 60%, #FFFFFF 100%); border-radius: 12px; margin-bottom: 12px;"></div>
+        <h3>Norway</h3>
+      </a>
+
+      <a href="denmark.html" class="country-item">
+        <div style="width: 100%; height: 120px; background: linear-gradient(180deg, #C8102E 0%, #C8102E 40%, #FFFFFF 40%, #FFFFFF 50%, #C8102E 50%, #C8102E 60%, #FFFFFF 60%, #FFFFFF 100%); border-radius: 12px; margin-bottom: 12px;"></div>
+        <h3>Denmark</h3>
+      </a>
+
+      <a href="poland.html" class="country-item">
+        <div style="width: 100%; height: 120px; background: linear-gradient(180deg, #FFFFFF 0%, #FFFFFF 50%, #DC143C 50%, #DC143C 100%); border-radius: 12px; margin-bottom: 12px;"></div>
+        <h3>Poland</h3>
+      </a>
+
+      <a href="czech-republic.html" class="country-item">
+        <div style="width: 100%; height: 120px; background: linear-gradient(180deg, #FFFFFF 0%, #FFFFFF 50%, #D7141A 50%, #D7141A 100%); border-radius: 12px; margin-bottom: 12px;"></div>
+        <h3>Czech Republic</h3>
+      </a>
+
+      <a href="austria.html" class="country-item">
+        <div style="width: 100%; height: 120px; background: linear-gradient(180deg, #ED2939 0%, #ED2939 33%, #FFFFFF 33%, #FFFFFF 66%, #ED2939 66%, #ED2939 100%); border-radius: 12px; margin-bottom: 12px;"></div>
+        <h3>Austria</h3>
+      </a>
+
+      <a href="ireland.html" class="country-item">
+        <div style="width: 100%; height: 120px; background: linear-gradient(90deg, #169B62 0%, #169B62 33%, #FFFFFF 33%, #FFFFFF 66%, #FF883E 66%, #FF883E 100%); border-radius: 12px; margin-bottom: 12px;"></div>
+        <h3>Ireland</h3>
+      </a>
+
+      <a href="new-zealand.html" class="country-item">
+        <div style="width: 100%; height: 120px; background: linear-gradient(180deg, #00247D 0%, #00247D 40%, #FFFFFF 40%, #FFFFFF 50%, #00247D 50%, #00247D 60%, #FFFFFF 60%, #FFFFFF 100%); border-radius: 12px; margin-bottom: 12px; position: relative;">
+          <div style="position: absolute; top: 10px; left: 10px; width: 30px; height: 30px; background: #FFFFFF; border-radius: 50%;"></div>
+        </div>
+        <h3>New Zealand</h3>
+      </a>
+
+      <a href="south-korea.html" class="country-item">
+        <div style="width: 100%; height: 120px; background: #FFFFFF; border-radius: 12px; margin-bottom: 12px; display: flex; align-items: center; justify-content: center; position: relative;">
+          <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #CE1126 0%, #CE1126 50%, #0047A0 50%, #0047A0 100%); border-radius: 50%; transform: rotate(45deg);"></div>
+        </div>
+        <h3>South Korea</h3>
+      </a>
+
+      <a href="china.html" class="country-item">
+        <div style="width: 100%; height: 120px; background: #DE2910; border-radius: 12px; margin-bottom: 12px; position: relative;">
+          <div style="position: absolute; top: 20px; left: 20px; width: 20px; height: 20px; background: #FFDE00; border-radius: 50%;"></div>
+          <div style="position: absolute; top: 30px; left: 35px; width: 15px; height: 15px; background: #FFDE00; border-radius: 50%;"></div>
+        </div>
+        <h3>China</h3>
+      </a>
+
+      <a href="india.html" class="country-item">
+        <div style="width: 100%; height: 120px; background: linear-gradient(180deg, #FF9933 0%, #FF9933 33%, #FFFFFF 33%, #FFFFFF 66%, #138808 66%, #138808 100%); border-radius: 12px; margin-bottom: 12px; position: relative;">
+          <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 30px; height: 30px; background: #000080; border-radius: 50%; border: 2px solid #FFFFFF;"></div>
+        </div>
+        <h3>India</h3>
+      </a>
+
+      <a href="brazil.html" class="country-item">
+        <div style="width: 100%; height: 120px; background: linear-gradient(180deg, #009739 0%, #009739 50%, #FEDD00 50%, #FEDD00 100%); border-radius: 12px; margin-bottom: 12px; position: relative;">
+          <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 50px; height: 50px; background: #002776; border-radius: 50%; border: 2px solid #FFFFFF;"></div>
+        </div>
+        <h3>Brazil</h3>
+      </a>
+
+      <a href="mexico.html" class="country-item">
+        <div style="width: 100%; height: 120px; background: linear-gradient(180deg, #006847 0%, #006847 33%, #FFFFFF 33%, #FFFFFF 66%, #CE1126 66%, #CE1126 100%); border-radius: 12px; margin-bottom: 12px; position: relative;">
+          <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 40px; height: 40px; background: #CE1126; border-radius: 50%; border: 3px solid #FFFFFF;"></div>
+        </div>
+        <h3>Mexico</h3>
+      </a>
+
+      <a href="argentina.html" class="country-item">
+        <div style="width: 100%; height: 120px; background: linear-gradient(180deg, #75AADB 0%, #75AADB 33%, #FFFFFF 33%, #FFFFFF 66%, #75AADB 66%, #75AADB 100%); border-radius: 12px; margin-bottom: 12px; position: relative;">
+          <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 30px; height: 30px; background: #F6B40E; border-radius: 50%; border: 2px solid #FFFFFF;"></div>
+        </div>
+        <h3>Argentina</h3>
+      </a>
+
+      <a href="chile.html" class="country-item">
+        <div style="width: 100%; height: 120px; background: linear-gradient(180deg, #0039A6 0%, #0039A6 33%, #FFFFFF 33%, #FFFFFF 50%, #D52B1E 50%, #D52B1E 100%); border-radius: 12px; margin-bottom: 12px;"></div>
+        <h3>Chile</h3>
+      </a>
+
+      <a href="south-africa.html" class="country-item">
+        <div style="width: 100%; height: 120px; background: linear-gradient(180deg, #000000 0%, #000000 20%, #FFB612 20%, #FFB612 40%, #FFFFFF 40%, #FFFFFF 60%, #007A4D 60%, #007A4D 80%, #DE3831 80%, #DE3831 100%); border-radius: 12px; margin-bottom: 12px;"></div>
+        <h3>South Africa</h3>
+      </a>
+
+      <a href="egypt.html" class="country-item">
+        <div style="width: 100%; height: 120px; background: linear-gradient(180deg, #CE1126 0%, #CE1126 33%, #FFFFFF 33%, #FFFFFF 66%, #000000 66%, #000000 100%); border-radius: 12px; margin-bottom: 12px; position: relative;">
+          <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 35px; height: 35px; background: #C8102E; border-radius: 50%; border: 3px solid #FFD700;"></div>
+        </div>
+        <h3>Egypt</h3>
+      </a>
+
+      <a href="morocco.html" class="country-item">
+        <div style="width: 100%; height: 120px; background: #C1272D; border-radius: 12px; margin-bottom: 12px; position: relative;">
+          <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 60px; height: 60px; background: #006233; border-radius: 50%; border: 3px solid #FFFFFF;"></div>
+        </div>
+        <h3>Morocco</h3>
+      </a>
+
+      <a href="thailand.html" class="country-item">
+        <div style="width: 100%; height: 120px; background: linear-gradient(180deg, #ED1C24 0%, #ED1C24 16%, #FFFFFF 16%, #FFFFFF 33%, #241D4F 33%, #241D4F 50%, #FFFFFF 50%, #FFFFFF 66%, #ED1C24 66%, #ED1C24 100%); border-radius: 12px; margin-bottom: 12px;"></div>
+        <h3>Thailand</h3>
+      </a>
+
+      <a href="malaysia.html" class="country-item">
+        <div style="width: 100%; height: 120px; background: linear-gradient(180deg, #000000 0%, #000000 25%, #FFFFFF 25%, #FFFFFF 50%, #FF0000 50%, #FF0000 75%, #FFFFFF 75%, #FFFFFF 100%); border-radius: 12px; margin-bottom: 12px;"></div>
+        <h3>Malaysia</h3>
+      </a>
+
+      <a href="indonesia.html" class="country-item">
+        <div style="width: 100%; height: 120px; background: linear-gradient(180deg, #FFFFFF 0%, #FFFFFF 50%, #FF0000 50%, #FF0000 100%); border-radius: 12px; margin-bottom: 12px;"></div>
+        <h3>Indonesia</h3>
+      </a>
+
+      <a href="philippines.html" class="country-item">
+        <div style="width: 100%; height: 120px; background: linear-gradient(180deg, #0038A8 0%, #0038A8 50%, #CE1126 50%, #CE1126 100%); border-radius: 12px; margin-bottom: 12px;"></div>
+        <h3>Philippines</h3>
+      </a>
+
+      <a href="vietnam.html" class="country-item">
+        <div style="width: 100%; height: 120px; background: #DA020E; border-radius: 12px; margin-bottom: 12px; position: relative;">
+          <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 40px; height: 40px; background: #FFD700; border-radius: 50%; border: 3px solid #FFFFFF;"></div>
+        </div>
+        <h3>Vietnam</h3>
+      </a>
+    </div>
+
+    <footer>
+      Copyright &copy; MRE
+    </footer>
+  </div>
+</body>
+</html>
+
