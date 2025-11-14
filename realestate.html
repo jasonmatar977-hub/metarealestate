@@ -1,0 +1,1249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meta Real Estate</title>
+    
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&display=swap');
+      
+    /* ---------- BASIC RESET ---------- */
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: 'Rajdhani', sans-serif;
+      background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 50%, #f0f4f8 100%);
+      color: #2c3e50;
+      min-height: 100vh;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: 
+        radial-gradient(circle at 20% 50%, rgba(212, 175, 55, 0.15) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(184, 134, 11, 0.12) 0%, transparent 50%),
+        radial-gradient(circle at 40% 20%, rgba(139, 69, 19, 0.1) 0%, transparent 50%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .page {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px 20px 60px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ---------- HEADER ---------- */
+    .header {
+      background: linear-gradient(135deg, rgba(212, 175, 55, 0.15) 0%, rgba(184, 134, 11, 0.2) 100%);
+      border: 2px solid rgba(212, 175, 55, 0.4);
+      border-radius: 24px;
+      padding: 32px 20px;
+      margin: 20px 0 40px;
+      text-align: center;
+      box-shadow: 
+        0 8px 32px rgba(0, 0, 0, 0.3),
+        0 0 40px rgba(212, 175, 55, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .header::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: linear-gradient(45deg, transparent, rgba(212, 175, 55, 0.1), transparent);
+      animation: shimmer 3s infinite;
+    }
+
+    @keyframes shimmer {
+      0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+      100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+    }
+
+    .header h1 {
+      margin: 0;
+      font-family: 'Orbitron', sans-serif;
+      font-size: clamp(36px, 6vw, 64px);
+      font-weight: 900;
+      letter-spacing: 4px;
+      background: linear-gradient(135deg, #d4af37 0%, #f4d03f 50%, #d4af37 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-shadow: 0 0 30px rgba(212, 175, 55, 0.5);
+      position: relative;
+      z-index: 1;
+      animation: glow 2s ease-in-out infinite alternate;
+    }
+
+    @keyframes glow {
+      from { filter: drop-shadow(0 0 10px rgba(212, 175, 55, 0.5)); }
+      to { filter: drop-shadow(0 0 20px rgba(212, 175, 55, 0.8)); }
+    }
+
+    /* ---------- TEXT SECTIONS ---------- */
+    h2 {
+      text-align: center;
+      margin: 32px 0 12px;
+      font-size: clamp(18px, 3vw, 24px);
+      font-weight: 600;
+      color: #34495e;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      letter-spacing: 1px;
+    }
+
+    h3 {
+      text-align: center;
+      margin: 12px 0 32px;
+      font-size: clamp(16px, 2.5vw, 20px);
+      font-weight: 400;
+      color: #b8860b;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .tagline-card {
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(250, 248, 245, 0.95) 100%);
+      border: 2px solid rgba(212, 175, 55, 0.4);
+      border-radius: 20px;
+      padding: 36px 32px;
+      margin: 40px 0 32px;
+      text-align: center;
+      font-size: clamp(17px, 2.5vw, 22px);
+      box-shadow: 
+        0 8px 32px rgba(0, 0, 0, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.8);
+      backdrop-filter: blur(10px);
+      line-height: 1.8;
+    }
+
+    .tagline-card strong {
+      color: #b8860b;
+      font-weight: 700;
+      font-size: 1.3em;
+      display: block;
+      margin-bottom: 16px;
+    }
+
+    .tagline-card p {
+      margin: 12px 0;
+      color: #34495e;
+    }
+
+    .tagline-highlight {
+      color: #d4af37;
+      font-weight: 600;
+    }
+
+    .subheading {
+      text-align: center;
+      margin: 24px 0 16px;
+      color: #b8860b;
+      font-size: clamp(18px, 2.5vw, 24px);
+      letter-spacing: 2px;
+      font-weight: 600;
+      text-transform: uppercase;
+      font-family: 'Orbitron', sans-serif;
+    }
+
+    .section-intro {
+      text-align: center;
+      margin: 0 0 32px 0;
+      color: #5d6d7e;
+      font-size: clamp(16px, 2vw, 19px);
+      line-height: 1.7;
+      max-width: 800px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    /* ---------- MISSION SECTION ---------- */
+    .mission-section {
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(250, 248, 245, 0.98) 100%);
+      border-radius: 24px;
+      border: 2px solid rgba(212, 175, 55, 0.4);
+      padding: 40px 32px;
+      margin: 40px 0;
+      box-shadow: 
+        0 8px 32px rgba(0, 0, 0, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.8);
+      backdrop-filter: blur(10px);
+    }
+
+    .mission-title {
+      text-align: center;
+      font-family: 'Orbitron', sans-serif;
+      font-size: clamp(24px, 4vw, 36px);
+      font-weight: 700;
+      color: #b8860b;
+      margin-bottom: 24px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .mission-content {
+      text-align: center;
+      font-size: clamp(16px, 2.5vw, 20px);
+      line-height: 1.8;
+      color: #34495e;
+      margin-bottom: 32px;
+    }
+
+    .mission-content strong {
+      color: #b8860b;
+      font-weight: 700;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 24px;
+      margin-top: 32px;
+    }
+
+    .feature-card {
+      background: rgba(255, 255, 255, 0.8);
+      border: 2px solid rgba(212, 175, 55, 0.3);
+      border-radius: 16px;
+      padding: 24px;
+      text-align: center;
+      transition: all 0.3s;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    }
+
+    .feature-card:hover {
+      transform: translateY(-5px);
+      background: rgba(255, 255, 255, 0.95);
+      border-color: rgba(212, 175, 55, 0.6);
+      box-shadow: 0 8px 24px rgba(212, 175, 55, 0.25);
+    }
+
+    .feature-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+      display: block;
+    }
+
+    .feature-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 20px;
+      font-weight: 700;
+      color: #b8860b;
+      margin-bottom: 12px;
+      letter-spacing: 1px;
+    }
+
+    .feature-description {
+      font-size: 16px;
+      color: #5d6d7e;
+      line-height: 1.6;
+    }
+
+    /* ---------- FLAGS (COUNTRIES) ---------- */
+    .countries {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 24px;
+      margin: 28px 0 16px;
+    }
+
+    .country-flag {
+      display: inline-block;
+      padding: 8px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, rgba(212, 175, 55, 0.1) 0%, rgba(184, 134, 11, 0.15) 100%);
+      border: 2px solid rgba(212, 175, 55, 0.3);
+      box-shadow: 
+        0 4px 16px rgba(0, 0, 0, 0.3),
+        0 0 20px rgba(212, 175, 55, 0.1);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      text-decoration: none;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .country-flag::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 0;
+      height: 0;
+      border-radius: 50%;
+      background: rgba(212, 175, 55, 0.2);
+      transform: translate(-50%, -50%);
+      transition: width 0.6s, height 0.6s;
+    }
+
+    .country-flag:hover::before {
+      width: 300px;
+      height: 300px;
+    }
+
+    .country-flag img {
+      display: block;
+      width: 110px;
+      height: 72px;
+      object-fit: cover;
+      border-radius: 12px;
+      position: relative;
+      z-index: 1;
+      transition: transform 0.3s;
+    }
+
+    .country-flag:hover {
+      transform: translateY(-8px) scale(1.05);
+      box-shadow: 
+        0 8px 32px rgba(0, 0, 0, 0.4),
+        0 0 40px rgba(212, 175, 55, 0.3);
+      border-color: rgba(212, 175, 55, 0.6);
+    }
+
+    .country-flag:hover img {
+      transform: scale(1.1);
+    }
+
+    .more-communities {
+      text-align: center;
+      margin: 20px 0 40px;
+      font-weight: 600;
+      color: #d4af37;
+      letter-spacing: 2px;
+      font-size: clamp(16px, 2.5vw, 20px);
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.3s;
+      text-decoration: none;
+      display: inline-block;
+      width: 100%;
+      padding: 12px;
+      border-radius: 12px;
+      background: rgba(212, 175, 55, 0.1);
+      border: 1px solid rgba(212, 175, 55, 0.3);
+    }
+
+    .more-communities:hover {
+      background: rgba(212, 175, 55, 0.2);
+      color: #f4d03f;
+      transform: scale(1.02);
+      box-shadow: 0 4px 20px rgba(212, 175, 55, 0.3);
+    }
+
+    /* ---------- COMMUNITY IMAGES SECTION ---------- */
+    .communities-section {
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(250, 248, 245, 0.98) 100%);
+      border-radius: 24px;
+      border: 2px solid rgba(212, 175, 55, 0.4);
+      padding: 32px 24px 36px;
+      box-shadow: 
+        0 8px 32px rgba(0, 0, 0, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.8);
+      backdrop-filter: blur(10px);
+    }
+
+    .communities {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 32px;
+      margin-top: 32px;
+    }
+
+    .community-card {
+      position: relative;
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 
+        0 8px 32px rgba(0, 0, 0, 0.5),
+        0 0 40px rgba(212, 175, 55, 0.2);
+      border: 2px solid rgba(212, 175, 55, 0.2);
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      background: linear-gradient(135deg, rgba(26, 31, 58, 0.9) 0%, rgba(45, 27, 46, 0.9) 100%);
+    }
+
+    .community-card:hover {
+      transform: translateY(-12px) scale(1.02);
+      box-shadow: 
+        0 16px 48px rgba(0, 0, 0, 0.6),
+        0 0 60px rgba(212, 175, 55, 0.4);
+      border-color: rgba(212, 175, 55, 0.6);
+    }
+
+    .community-card img {
+      width: 100%;
+      height: 280px;
+      object-fit: cover;
+      display: block;
+      transition: transform 0.4s;
+    }
+
+    .community-card:hover img {
+      transform: scale(1.1);
+    }
+
+    .community-overlay {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(to top, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.85) 70%, transparent 100%);
+      padding: 24px;
+      transform: translateY(0);
+      transition: transform 0.4s;
+    }
+
+    .community-card:hover .community-overlay {
+      transform: translateY(0);
+    }
+
+    .community-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 22px;
+      font-weight: 700;
+      color: #b8860b;
+      margin-bottom: 8px;
+      letter-spacing: 1px;
+    }
+
+    .community-description {
+      font-size: 15px;
+      color: #34495e;
+      line-height: 1.6;
+      margin: 0;
+    }
+
+    /* ---------- FOOTER ---------- */
+    footer {
+      margin-top: 50px;
+      text-align: center;
+      padding: 20px;
+      font-size: 14px;
+      color: #5d6d7e;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(250, 248, 245, 0.95) 100%);
+      border-radius: 16px;
+      border: 2px solid rgba(212, 175, 55, 0.3);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    }
+
+    /* ---------- RESPONSIVE ---------- */
+    @media (max-width: 600px) {
+      .header {
+        margin-top: 10px;
+        padding: 24px 16px;
+      }
+
+      .tagline-card {
+        margin-top: 28px;
+        padding: 20px 16px;
+      }
+
+      .communities {
+        grid-template-columns: 1fr;
+        gap: 24px;
+      }
+
+      .community-card img {
+        height: 220px;
+      }
+
+      .country-flag img {
+        width: 90px;
+        height: 60px;
+      }
+
+      .mission-section {
+        padding: 28px 20px;
+      }
+
+      .features-grid {
+        grid-template-columns: 1fr;
+        gap: 20px;
+      }
+
+      .mission-content {
+        font-size: 16px;
+      }
+    }
+
+    /* ---------- AI CHATBOT ---------- */
+    .chatbot-container {
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      z-index: 1000;
+      font-family: 'Rajdhani', sans-serif;
+    }
+
+    .chatbot-button {
+      width: 70px;
+      height: 70px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #d4af37 0%, #f4d03f 100%);
+      border: 3px solid rgba(212, 175, 55, 0.5);
+      box-shadow: 
+        0 8px 32px rgba(212, 175, 55, 0.4),
+        0 0 40px rgba(212, 175, 55, 0.3);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s;
+      position: relative;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% {
+        box-shadow: 
+          0 8px 32px rgba(212, 175, 55, 0.4),
+          0 0 40px rgba(212, 175, 55, 0.3);
+      }
+      50% {
+        box-shadow: 
+          0 8px 32px rgba(212, 175, 55, 0.6),
+          0 0 60px rgba(212, 175, 55, 0.5);
+      }
+    }
+
+    .chatbot-button:hover {
+      transform: scale(1.1);
+      box-shadow: 
+        0 12px 40px rgba(212, 175, 55, 0.6),
+        0 0 60px rgba(212, 175, 55, 0.5);
+    }
+
+    .chatbot-button svg {
+      width: 35px;
+      height: 35px;
+      fill: #0a0e27;
+    }
+
+    .chatbot-window {
+      position: absolute;
+      bottom: 90px;
+      right: 0;
+      width: 380px;
+      height: 600px;
+      max-height: 80vh;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(250, 248, 245, 0.98) 100%);
+      border: 2px solid rgba(212, 175, 55, 0.4);
+      border-radius: 24px;
+      box-shadow: 
+        0 16px 48px rgba(0, 0, 0, 0.15),
+        0 0 60px rgba(212, 175, 55, 0.25);
+      backdrop-filter: blur(20px);
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+      animation: slideUp 0.3s ease-out;
+    }
+
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .chatbot-window.active {
+      display: flex;
+    }
+
+    .chatbot-header {
+      background: linear-gradient(135deg, rgba(212, 175, 55, 0.2) 0%, rgba(184, 134, 11, 0.25) 100%);
+      padding: 20px;
+      border-bottom: 2px solid rgba(212, 175, 55, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .chatbot-header h3 {
+      margin: 0;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 18px;
+      font-weight: 700;
+      color: #d4af37;
+      letter-spacing: 1px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .chatbot-status {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #4ade80;
+      box-shadow: 0 0 10px rgba(74, 222, 128, 0.6);
+      animation: blink 2s infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .chatbot-close {
+      background: transparent;
+      border: none;
+      color: #d4af37;
+      font-size: 24px;
+      cursor: pointer;
+      padding: 0;
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      transition: all 0.3s;
+    }
+
+    .chatbot-close:hover {
+      background: rgba(212, 175, 55, 0.2);
+      transform: rotate(90deg);
+    }
+
+    .chatbot-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .chatbot-messages::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .chatbot-messages::-webkit-scrollbar-track {
+      background: rgba(212, 175, 55, 0.1);
+      border-radius: 10px;
+    }
+
+    .chatbot-messages::-webkit-scrollbar-thumb {
+      background: rgba(212, 175, 55, 0.4);
+      border-radius: 10px;
+    }
+
+    .message {
+      display: flex;
+      gap: 10px;
+      animation: fadeIn 0.3s;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .message.user {
+      flex-direction: row-reverse;
+    }
+
+    .message-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .message.bot .message-avatar {
+      background: linear-gradient(135deg, #d4af37 0%, #f4d03f 100%);
+      color: #0a0e27;
+      font-weight: 700;
+      font-size: 18px;
+    }
+
+    .message.user .message-avatar {
+      background: rgba(212, 175, 55, 0.2);
+      color: #d4af37;
+      font-weight: 700;
+      font-size: 18px;
+    }
+
+    .message-content {
+      max-width: 75%;
+      padding: 12px 16px;
+      border-radius: 16px;
+      line-height: 1.5;
+      font-size: 15px;
+    }
+
+    .message.bot .message-content {
+      background: rgba(255, 250, 240, 0.9);
+      border: 1px solid rgba(212, 175, 55, 0.4);
+      color: #34495e;
+      border-bottom-left-radius: 4px;
+    }
+
+    .message.user .message-content {
+      background: linear-gradient(135deg, rgba(212, 175, 55, 0.2) 0%, rgba(184, 134, 11, 0.25) 100%);
+      border: 1px solid rgba(212, 175, 55, 0.5);
+      color: #2c3e50;
+      border-bottom-right-radius: 4px;
+    }
+
+    .chatbot-input-container {
+      padding: 20px;
+      border-top: 2px solid rgba(212, 175, 55, 0.3);
+      background: rgba(255, 255, 255, 0.8);
+    }
+
+    .chatbot-input-wrapper {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .chatbot-input {
+      flex: 1;
+      padding: 12px 16px;
+      background: rgba(255, 255, 255, 0.95);
+      border: 2px solid rgba(212, 175, 55, 0.3);
+      border-radius: 12px;
+      color: #2c3e50;
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 15px;
+      outline: none;
+      transition: all 0.3s;
+    }
+
+    .chatbot-input:focus {
+      border-color: rgba(212, 175, 55, 0.6);
+      box-shadow: 0 0 20px rgba(212, 175, 55, 0.2);
+      background: rgba(255, 255, 255, 1);
+    }
+
+    .chatbot-send {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #d4af37 0%, #f4d03f 100%);
+      border: none;
+      color: #0a0e27;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s;
+      flex-shrink: 0;
+    }
+
+    .chatbot-send:hover {
+      transform: scale(1.1);
+      box-shadow: 0 4px 20px rgba(212, 175, 55, 0.4);
+    }
+
+    .chatbot-send:active {
+      transform: scale(0.95);
+    }
+
+    .typing-indicator {
+      display: flex;
+      gap: 4px;
+      padding: 12px 16px;
+    }
+
+    .typing-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #d4af37;
+      animation: typing 1.4s infinite;
+    }
+
+    .typing-dot:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+
+    .typing-dot:nth-child(3) {
+      animation-delay: 0.4s;
+    }
+
+    @keyframes typing {
+      0%, 60%, 100% {
+        transform: translateY(0);
+        opacity: 0.7;
+      }
+      30% {
+        transform: translateY(-10px);
+        opacity: 1;
+      }
+    }
+
+    @media (max-width: 600px) {
+      .chatbot-container {
+        bottom: 20px;
+        right: 20px;
+      }
+
+      .chatbot-window {
+        width: calc(100vw - 40px);
+        right: -20px;
+        bottom: 80px;
+        height: calc(100vh - 120px);
+        max-height: calc(100vh - 120px);
+      }
+
+      .chatbot-button {
+        width: 60px;
+        height: 60px;
+      }
+
+      .chatbot-button svg {
+        width: 30px;
+        height: 30px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="page">
+    <!-- HEADER -->
+    <header class="header">
+      <h1>META REAL ESTATE</h1>
+    </header>
+
+    <!-- MISSION SECTION -->
+    <section class="mission-section">
+      <h2 class="mission-title">Our Mission</h2>
+      <div class="mission-content">
+        <p>At <strong>Meta Real Estate</strong>, we revolutionize the way you discover and acquire property. Our advanced matching technology connects <strong>buyers with sellers</strong>, creating perfect partnerships that transform dreams into reality.</p>
+        <p style="margin-top: 20px;">Whether you're searching for your <strong>dream house</strong>, seeking the perfect <strong>investment opportunity</strong>, or looking to sell your property to the right buyer, we make the right match—<strong>your way</strong>.</p>
+      </div>
+
+      <div class="features-grid">
+        <div class="feature-card">
+          <span class="feature-icon">🔗</span>
+          <h3 class="feature-title">Perfect Matching</h3>
+          <p class="feature-description">Our intelligent system connects buyers with sellers based on preferences, budget, and location, ensuring the perfect match every time.</p>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">🏠</span>
+          <h3 class="feature-title">Dream Properties</h3>
+          <p class="feature-description">Find your dream house, apartment, or investment property from our extensive global network of premium listings.</p>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">💎</span>
+          <h3 class="feature-title">Smart Investments</h3>
+          <p class="feature-description">Discover lucrative real estate opportunities tailored to your investment goals and financial strategy.</p>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">🌍</span>
+          <h3 class="feature-title">Global Reach</h3>
+          <p class="feature-description">Access properties worldwide, connecting with communities across continents to find your perfect match.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- INTRO TEXT + FLAGS -->
+    <h2>Join the millions who buy and sell from each other every day in local communities around the world.</h2>
+    <h3>Find your community below</h3>
+
+    <div class="countries">
+      <!-- Lebanon clickable -->
+      <a class="country-flag" href="lebanon.html">
+        <img src="Lb.jpg" alt="Lebanon" />
+      </a>
+
+      <a class="country-flag" href="usa.html">
+        <img src="US.jpg" alt="United States" />
+      </a>
+
+      <a class="country-flag" href="spain.html">
+        <img src="spain.jpg" alt="Spain" />
+      </a>
+
+      <a class="country-flag" href="australia.html">
+        <img src="Aust.jpg" alt="Australia" />
+      </a>
+    </div>
+
+    <a href="more-communities.html" class="more-communities">More communities →</a>
+
+    <!-- TAGLINE CARD + COMMUNITY IMAGES -->
+    <section class="communities-section">
+      <div class="tagline-card">
+        <strong>The Future of Real Estate is Here</strong>
+        <p>Step into a new era where <span class="tagline-highlight">artificial intelligence meets human dreams</span>. 
+        At Meta Real Estate, we've revolutionized property discovery through advanced algorithms that analyze millions 
+        of data points to create perfect matches between buyers and sellers.</p>
+        <p>Our platform doesn't just list properties—it <span class="tagline-highlight">understands your vision</span>, 
+        learns your preferences, and connects you with opportunities that align with your lifestyle, budget, and aspirations. 
+        Whether you're seeking a luxury penthouse, a sustainable smart home, or a strategic investment property, 
+        our technology ensures you find exactly what you're looking for, <span class="tagline-highlight">faster and smarter</span> than ever before.</p>
+        <p>Join thousands of satisfied clients who have discovered their perfect property through our innovative matching system. 
+        <span class="tagline-highlight">Your dream property awaits—let's make it reality.</span></p>
+      </div>
+
+      <h3 class="subheading">The Future of Property Discovery</h3>
+      <p class="section-intro">Experience next-generation real estate through our cutting-edge platform. Explore how technology 
+      transforms property search, investment analysis, and buyer-seller connections in the digital age.</p>
+
+      <div class="communities">
+        <div class="community-card">
+          <img src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&q=80" alt="Futuristic smart city with modern architecture" />
+          <div class="community-overlay">
+            <h3 class="community-title">Smart City Living</h3>
+            <p class="community-description">Discover properties in intelligent, connected communities where technology enhances every aspect of daily life. From automated climate control to integrated security systems, experience the future of urban living.</p>
+          </div>
+        </div>
+
+        <div class="community-card">
+          <img src="https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&q=80" alt="Modern sustainable architecture with green technology" />
+          <div class="community-overlay">
+            <h3 class="community-title">Sustainable Innovation</h3>
+            <p class="community-description">Invest in eco-friendly properties that combine luxury with environmental responsibility. Solar-powered homes, green roofs, and energy-efficient designs that reduce your carbon footprint while maximizing comfort.</p>
+          </div>
+        </div>
+
+        <div class="community-card">
+          <img src="https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=800&q=80" alt="Virtual reality property viewing technology" />
+          <div class="community-overlay">
+            <h3 class="community-title">Virtual Reality Tours</h3>
+            <p class="community-description">Explore properties from anywhere in the world through immersive VR technology. Walk through homes, inspect details, and visualize your future before you even step foot inside. The future of property viewing is here.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer>
+      Copyright &copy; MRE
+    </footer>
+  </div>
+
+  <!-- AI CHATBOT -->
+  <div class="chatbot-container">
+    <div class="chatbot-window" id="chatbotWindow">
+      <div class="chatbot-header">
+        <h3>
+          <span class="chatbot-status"></span>
+          AI Assistant
+        </h3>
+        <button class="chatbot-close" id="chatbotClose">&times;</button>
+      </div>
+      <div class="chatbot-messages" id="chatbotMessages">
+        <div class="message bot">
+          <div class="message-avatar">AI</div>
+          <div class="message-content">
+            Hello! I'm your AI real estate assistant. I specialize in real estate questions and website navigation. I can help you find properties, answer questions about buying, selling, investing, or renting, and guide you through our platform. How can I assist you today?
+          </div>
+        </div>
+      </div>
+      <div class="chatbot-input-container">
+        <div class="chatbot-input-wrapper">
+          <input type="text" class="chatbot-input" id="chatbotInput" placeholder="Type your message..." />
+          <button class="chatbot-send" id="chatbotSend">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="chatbot-button" id="chatbotButton">
+      <svg viewBox="0 0 24 24" fill="currentColor">
+        <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
+        <path d="M7 9h2v2H7zm4 0h2v2h-2zm4 0h2v2h-2z"/>
+      </svg>
+    </div>
+  </div>
+
+  <script>
+    // Chatbot functionality
+    const chatbotButton = document.getElementById('chatbotButton');
+    const chatbotWindow = document.getElementById('chatbotWindow');
+    const chatbotClose = document.getElementById('chatbotClose');
+    const chatbotInput = document.getElementById('chatbotInput');
+    const chatbotSend = document.getElementById('chatbotSend');
+    const chatbotMessages = document.getElementById('chatbotMessages');
+
+    // Open/close chatbot
+    chatbotButton.addEventListener('click', () => {
+      chatbotWindow.classList.toggle('active');
+      if (chatbotWindow.classList.contains('active')) {
+        chatbotInput.focus();
+      }
+    });
+
+    chatbotClose.addEventListener('click', () => {
+      chatbotWindow.classList.remove('active');
+    });
+
+    // Real estate and website-related keywords
+    const realEstateKeywords = [
+      'property', 'properties', 'real estate', 'house', 'houses', 'home', 'homes', 'apartment', 'apartments',
+      'villa', 'villas', 'condo', 'condos', 'townhouse', 'land', 'commercial', 'residential', 'buy', 'buying',
+      'purchase', 'sell', 'selling', 'list', 'listing', 'rent', 'renting', 'rental', 'lease', 'leasing',
+      'invest', 'investment', 'investing', 'investor', 'buyer', 'seller', 'renter', 'landlord', 'tenant',
+      'price', 'pricing', 'cost', 'budget', 'sqm', 'sqft', 'square meter', 'square feet', 'bedroom', 'bedrooms',
+      'bathroom', 'bathrooms', 'location', 'area', 'region', 'city', 'country', 'countries', 'neighborhood',
+      'amenities', 'features', 'mortgage', 'loan', 'financing', 'down payment', 'closing', 'contract',
+      'inspection', 'appraisal', 'agent', 'broker', 'realtor', 'market', 'market value', 'appreciation',
+      'depreciation', 'equity', 'title', 'deed', 'zoning', 'permit', 'tax', 'insurance', 'hoa', 'association',
+      'lebanon', 'usa', 'united states', 'spain', 'australia', 'beirut', 'sydney', 'melbourne', 'madrid',
+      'barcelona', 'new york', 'california', 'florida', 'texas'
+    ];
+
+    const websiteKeywords = [
+      'website', 'site', 'page', 'navigate', 'navigation', 'how to', 'where is', 'how do i', 'help',
+      'instruction', 'guide', 'tutorial', 'search', 'filter', 'form', 'questionnaire', 'submit',
+      'contact', 'email', 'phone', 'support', 'faq', 'about', 'services', 'platform', 'system',
+      'matching', 'algorithm', 'feature', 'features', 'flag', 'flags', 'country', 'communities',
+      'more communities', 'homepage', 'home page', 'main page'
+    ];
+
+    // Function to check if message is real estate or website related
+    function isRealEstateOrWebsiteRelated(message) {
+      const lowerMessage = message.toLowerCase();
+      const allKeywords = [...realEstateKeywords, ...websiteKeywords];
+      
+      // Check for real estate or website keywords
+      for (const keyword of allKeywords) {
+        if (lowerMessage.includes(keyword)) {
+          return true;
+        }
+      }
+      
+      // Check for common real estate question patterns
+      const realEstatePatterns = [
+        /\b(what|where|how|when|why|can|should|do|does|is|are|will)\b.*\b(property|house|home|apartment|buy|sell|rent|invest)\b/i,
+        /\b(buy|sell|rent|invest).*\b(property|house|home|apartment)\b/i,
+        /\b(property|house|home|apartment).*\b(buy|sell|rent|invest|find|search|look)\b/i
+      ];
+      
+      for (const pattern of realEstatePatterns) {
+        if (pattern.test(message)) {
+          return true;
+        }
+      }
+      
+      return false;
+    }
+
+    // AI responses database
+    const aiResponses = {
+      greeting: [
+        "Hello! I'm your AI real estate assistant. I can help you with property searches, buying, selling, investing, renting, or guide you through our website. How can I assist you today?",
+        "Hi there! I specialize in real estate assistance and website navigation. What would you like to know about properties or our platform?",
+        "Welcome! I'm here to help with all your real estate needs and answer questions about our website. What can I help you with?"
+      ],
+      buying: [
+        "Great! I can help you find the perfect property. Which country or region are you interested in? You can browse our available locations by clicking on the country flags on the homepage.",
+        "To help you find the right property, I'll need to know: your preferred location, budget range, property type (house, apartment, villa), and any specific requirements. Click on a country flag to start your search!",
+        "I'd be happy to assist with your property search! We have listings in Lebanon, USA, Spain, and Australia. Click on any country flag to see available properties and fill out the buyer questionnaire."
+      ],
+      selling: [
+        "I can help you list your property! Click on your country's flag on the homepage, then select 'Seller' in the questionnaire. You'll need to provide: property location, type, size, and your asking price.",
+        "Selling your property? Great! We can help connect you with qualified buyers. Click on your country flag, choose 'Seller', and fill out our detailed form with your property information.",
+        "To sell your property, click on your country's flag on the homepage, select 'Seller' in the form, and provide details about location, property type, size, and price. I can guide you through any step!"
+      ],
+      investing: [
+        "Investment properties are a smart choice! Click on a country flag to explore investment opportunities. Select 'Investor' in the questionnaire and specify the type of investment (residential, commercial, land) you're interested in.",
+        "For investment properties, we recommend considering location, growth potential, rental yield, and market trends. Click on any country flag to see investment options and fill out the investor form.",
+        "Great investment opportunity! We have properties across multiple markets. Click on a country flag, select 'Investor', and tell us about your investment goals and preferred locations."
+      ],
+      renting: [
+        "Looking to rent? Click on a country flag on the homepage, then select 'Renter' in the questionnaire. You can specify your preferred area, budget, and property requirements.",
+        "For rentals, we have properties available in Lebanon, USA, Spain, and Australia. Click on any country flag, choose 'Renter', and fill out the form with your preferences.",
+        "I can help you find the perfect rental! Click on a country flag from the homepage, select 'Renter', and provide your location preferences, budget, and requirements."
+      ],
+      countries: [
+        "We currently operate in Lebanon, United States, Spain, and Australia, with more countries coming soon! Click on any country flag on the homepage, or click 'More communities' to see all available locations.",
+        "You can find properties in Lebanon, USA, Spain, and Australia. Each country has its own dedicated page with detailed search options. Click on a country flag to get started!",
+        "Our platform covers Lebanon, United States, Spain, and Australia. Click on any country flag on the homepage to access that country's property search page with detailed filters."
+      ],
+      website: [
+        "I'd be happy to help you navigate our website! The homepage shows country flags - click any flag to search properties in that country. You can also click 'More communities' to see all available locations. What specific feature would you like help with?",
+        "To navigate our site: Click country flags to search properties, use 'More communities' to see all countries, and fill out questionnaires on each country page to specify your needs. What would you like to do?",
+        "Here's how to use our website: 1) Click a country flag to search properties there, 2) Select 'More communities' for all locations, 3) Fill out the questionnaire (buyer/seller/investor/renter) with your preferences. Need help with something specific?",
+        "Our website features: Country flags for property search, detailed questionnaires for each country, and an AI matching system. Click any country flag to start, or ask me about a specific feature!",
+        "To search for properties: Click on a country flag (Lebanon, USA, Spain, or Australia), then fill out the questionnaire selecting whether you're a buyer, seller, investor, or renter. I can guide you through any step!"
+      ],
+      offTopic: [
+        "I'm specialized in real estate assistance and website navigation only. I can help you with buying, selling, investing, or renting properties, or guide you through our website. What real estate question can I answer?",
+        "I focus exclusively on real estate and our website features. I can assist with property searches, explain our services, help you navigate the site, or answer questions about buying, selling, investing, or renting. How can I help with real estate?",
+        "I'm here to help with real estate matters and website navigation. I can assist with finding properties, understanding our matching system, navigating the site, or questions about buying, selling, investing, or renting. What real estate question do you have?",
+        "I specialize in real estate assistance only. I can help you find properties, understand our platform, navigate the website, or answer questions about buying, selling, investing, or renting. What would you like to know about real estate?"
+      ],
+      default: [
+        "I can help you with real estate questions or website navigation. Are you looking to buy, sell, invest, or rent a property? Or do you need help navigating our website?",
+        "I specialize in real estate assistance. I can help with property searches, buying, selling, investing, renting, or guide you through our website. What would you like to know?",
+        "I'm here to help with real estate and website questions. I can assist with finding properties, understanding our services, or navigating the site. What can I help you with?"
+      ]
+    };
+
+    // Function to detect intent from user message
+    function detectIntent(message) {
+      const lowerMessage = message.toLowerCase();
+      
+      // First check if it's real estate or website related
+      if (!isRealEstateOrWebsiteRelated(message)) {
+        return 'offTopic';
+      }
+      
+      // Website navigation questions
+      if (lowerMessage.match(/\b(how|where|what|navigate|navigation|website|site|page|use|using|help|guide|instruction|tutorial|feature|features|flag|flags|questionnaire|form|submit|search|filter)\b/)) {
+        // Check if it's specifically about website navigation
+        if (lowerMessage.match(/\b(how (to|do|can)|where (is|are|can|do)|navigate|navigation|website|site|page|use|using|help|guide|instruction|tutorial|feature|features|flag|flags|questionnaire|form|submit|search|filter|click|select|choose)\b/)) {
+          return 'website';
+        }
+      }
+      
+      // Greeting
+      if (lowerMessage.match(/\b(hi|hello|hey|greetings|good morning|good afternoon|good evening)\b/)) {
+        return 'greeting';
+      }
+      
+      // Buying
+      if (lowerMessage.match(/\b(buy|buying|purchase|looking for|find|search|property|house|apartment|villa|condo|townhouse)\b/)) {
+        return 'buying';
+      }
+      
+      // Selling
+      if (lowerMessage.match(/\b(sell|selling|list|listing|put on market)\b/)) {
+        return 'selling';
+      }
+      
+      // Investing
+      if (lowerMessage.match(/\b(invest|investment|investing|opportunity|portfolio)\b/)) {
+        return 'investing';
+      }
+      
+      // Renting
+      if (lowerMessage.match(/\b(rent|renting|rental|lease|leasing)\b/)) {
+        return 'renting';
+      }
+      
+      // Countries
+      if (lowerMessage.match(/\b(country|countries|location|where|region|area|lebanon|usa|spain|australia|beirut|sydney|madrid|barcelona)\b/)) {
+        return 'countries';
+      }
+      
+      return 'default';
+    }
+
+    // Function to get AI response
+    function getAIResponse(intent) {
+      const responses = aiResponses[intent] || aiResponses.default;
+      return responses[Math.floor(Math.random() * responses.length)];
+    }
+
+    // Function to add message to chat
+    function addMessage(text, isUser = false) {
+      const messageDiv = document.createElement('div');
+      messageDiv.className = `message ${isUser ? 'user' : 'bot'}`;
+      
+      const avatar = document.createElement('div');
+      avatar.className = 'message-avatar';
+      avatar.textContent = isUser ? 'You' : 'AI';
+      
+      const content = document.createElement('div');
+      content.className = 'message-content';
+      content.textContent = text;
+      
+      messageDiv.appendChild(avatar);
+      messageDiv.appendChild(content);
+      chatbotMessages.appendChild(messageDiv);
+      
+      chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
+    }
+
+    // Function to show typing indicator
+    function showTypingIndicator() {
+      const typingDiv = document.createElement('div');
+      typingDiv.className = 'message bot';
+      typingDiv.id = 'typingIndicator';
+      
+      const avatar = document.createElement('div');
+      avatar.className = 'message-avatar';
+      avatar.textContent = 'AI';
+      
+      const typing = document.createElement('div');
+      typing.className = 'typing-indicator';
+      typing.innerHTML = '<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>';
+      
+      typingDiv.appendChild(avatar);
+      typingDiv.appendChild(typing);
+      chatbotMessages.appendChild(typingDiv);
+      chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
+    }
+
+    // Function to remove typing indicator
+    function removeTypingIndicator() {
+      const indicator = document.getElementById('typingIndicator');
+      if (indicator) {
+        indicator.remove();
+      }
+    }
+
+    // Function to send message
+    function sendMessage() {
+      const message = chatbotInput.value.trim();
+      if (!message) return;
+      
+      // Add user message
+      addMessage(message, true);
+      chatbotInput.value = '';
+      
+      // Show typing indicator
+      showTypingIndicator();
+      
+      // Simulate AI thinking time
+      setTimeout(() => {
+        removeTypingIndicator();
+        const intent = detectIntent(message);
+        const response = getAIResponse(intent);
+        addMessage(response);
+      }, 1000 + Math.random() * 1000);
+    }
+
+    // Event listeners
+    chatbotSend.addEventListener('click', sendMessage);
+    chatbotInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        sendMessage();
+      }
+    });
+  </script>
+</body>
+</html>
+
+
