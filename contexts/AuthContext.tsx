@@ -25,6 +25,7 @@ interface User {
 interface AuthContextType {
   isAuthenticated: boolean;
   user: User | null;
+  isLoading: boolean;
   login: (email: string, password: string) => Promise<boolean>;
   register: (userData: RegisterData) => Promise<boolean>;
   logout: () => void;
@@ -45,21 +46,36 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Check for existing auth state on mount (from localStorage)
+  // Guard with window check for SSR safety
   useEffect(() => {
-    const storedAuth = localStorage.getItem('auth');
-    if (storedAuth) {
-      try {
-        const authData = JSON.parse(storedAuth);
-        if (authData.isAuthenticated && authData.user) {
-          setIsAuthenticated(true);
-          setUser(authData.user);
+    if (typeof window === "undefined") {
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      const storedAuth = localStorage.getItem('auth');
+      if (storedAuth) {
+        try {
+          const authData = JSON.parse(storedAuth);
+          if (authData.isAuthenticated && authData.user) {
+            setIsAuthenticated(true);
+            setUser(authData.user);
+          }
+        } catch (error) {
+          // Invalid stored data, clear it
+          if (typeof window !== "undefined") {
+            localStorage.removeItem('auth');
+          }
         }
-      } catch (error) {
-        // Invalid stored data, clear it
-        localStorage.removeItem('auth');
       }
+    } catch (error) {
+      console.error("Error loading auth state:", error);
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
@@ -89,7 +105,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setIsAuthenticated(true);
     setUser(mockUser);
-    localStorage.setItem('auth', JSON.stringify({ isAuthenticated: true, user: mockUser }));
+    
+    // Guard localStorage access
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem('auth', JSON.stringify({ isAuthenticated: true, user: mockUser }));
+      } catch (error) {
+        console.error("Error saving auth state:", error);
+      }
+    }
+    
     return true;
   };
 
@@ -117,7 +142,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setIsAuthenticated(true);
     setUser(newUser);
-    localStorage.setItem('auth', JSON.stringify({ isAuthenticated: true, user: newUser }));
+    
+    // Guard localStorage access
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem('auth', JSON.stringify({ isAuthenticated: true, user: newUser }));
+      } catch (error) {
+        console.error("Error saving auth state:", error);
+      }
+    }
+    
     return true;
   };
 
@@ -128,12 +162,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     setIsAuthenticated(false);
     setUser(null);
-    localStorage.removeItem('auth');
+    
+    // Guard localStorage access
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.removeItem('auth');
+      } catch (error) {
+        console.error("Error clearing auth state:", error);
+      }
+    }
+    
     // TODO: Call backend logout endpoint to invalidate token
   };
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, user, login, register, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, user, isLoading, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   );

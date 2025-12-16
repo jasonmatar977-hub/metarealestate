@@ -1,6 +1,8 @@
 /**
  * Landing Page (Root Route: /)
  * Modern landing page with hero, about, services, testimonials, and contact sections
+ * 
+ * Safe for logged-out users - no auth state required
  */
 
 import Navbar from "@/components/Navbar";

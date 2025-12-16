@@ -22,7 +22,7 @@ interface Message {
 }
 
 export default function ChatPage() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -38,10 +38,10 @@ export default function ChatPage() {
   useEffect(() => {
     // SECURITY: Front-end route protection
     // TODO: Implement server-side protection with middleware/API routes
-    if (!isAuthenticated) {
+    if (!authLoading && !isAuthenticated) {
       router.push("/login");
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, authLoading, router]);
 
   useEffect(() => {
     // Auto-scroll to bottom when new messages arrive
@@ -104,8 +104,30 @@ export default function ChatPage() {
     }
   };
 
+  // Show loading state while checking auth
+  if (authLoading) {
+    return (
+      <main className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gold mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </main>
+    );
+  }
+
+  // Show fallback UI while redirecting
   if (!isAuthenticated) {
-    return null; // Will redirect
+    return (
+      <main className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-600 mb-4">Please log in to use the chat.</p>
+          <a href="/login" className="text-gold hover:text-gold-dark font-semibold">
+            Go to Login
+          </a>
+        </div>
+      </main>
+    );
   }
 
   return (

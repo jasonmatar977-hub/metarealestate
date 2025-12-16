@@ -62,19 +62,41 @@ const MOCK_PROPERTIES = [
 ];
 
 export default function ListingsPage() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
     // SECURITY: Front-end route protection
     // TODO: Implement server-side protection with middleware/API routes
-    if (!isAuthenticated) {
+    if (!isLoading && !isAuthenticated) {
       router.push("/login");
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, isLoading, router]);
 
+  // Show loading state while checking auth
+  if (isLoading) {
+    return (
+      <main className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gold mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </main>
+    );
+  }
+
+  // Show fallback UI while redirecting
   if (!isAuthenticated) {
-    return null; // Will redirect
+    return (
+      <main className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-600 mb-4">Please log in to view listings.</p>
+          <a href="/login" className="text-gold hover:text-gold-dark font-semibold">
+            Go to Login
+          </a>
+        </div>
+      </main>
+    );
   }
 
   return (
