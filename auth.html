@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!--  BASIC DOCUMENT METADATA -->
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Meta Real Estate – Login &amp; Sign Up</title>
+
+  <meta name="description" content="Authentication page for Meta Real Estate, a modern luxury real estate platform. Log in or create an account to manage properties, save searches, and receive smart property matches.">
+
+  <!-- FONTS & GLOBAL STYLES -->
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&display=swap');
+
+    /* ---------- BASIC RESET ---------- */
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: 'Rajdhani', sans-serif;
+      background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 50%, #f0f4f8 100%);
+      color: #2c3e50;
+      min-height: 100vh;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background:
+        radial-gradient(circle at 20% 50%, rgba(212, 175, 55, 0.15) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(184, 134, 11, 0.12) 0%, transparent 50%),
+        radial-gradient(circle at 40% 20%, rgba(139, 69, 19, 0.1) 0%, transparent 50%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .page {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 20px 20px 60px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ---------- HEADER ---------- */
+    .header {
+      background: linear-gradient(135deg, rgba(212, 175, 55, 0.15) 0%, rgba(184, 134, 11, 0.2) 100%);
+      border: 2px solid rgba(212, 175, 55, 0.4);
+      border-radius: 24px;
+      padding: 28px 20px;
+      margin: 20px 0 40px;
+      text-align: center;
+      box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.3),
+        0 0 40px rgba(212, 175, 55, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .header::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: linear-gradient(45deg, transparent, rgba(212, 175, 55, 0.2), transparent);
+      animation: shimmer 3s infinite;
+    }
+
+    @keyframes shimmer {
+      0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+      100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+    }
+
+    .header h1 {
+      margin: 0;
+      font-family: 'Orbitron', sans-serif;
+      font-size: clamp(32px, 6vw, 52px);
+      font-weight: 900;
+      letter-spacing: 4px;
+      background: linear-gradient(135deg, #d4af37 0%, #f4d03f 50%, #d4af37 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-shadow: 0 0 30px rgba(212, 175, 55, 0.5);
+      position: relative;
+      z-index: 1;
+      animation: glow 2s ease-in-out infinite alternate;
+    }
+
+    .header p {
+      margin: 16px 0 0;
+      position: relative;
+      z-index: 1;
+      color: #fdfaf0;
+      font-size: 16px;
+      letter-spacing: 1px;
+    }
+
+    @keyframes glow {
+      from { filter: drop-shadow(0 0 10px rgba(212, 175, 55, 0.5)); }
+      to { filter: drop-shadow(0 0 20px rgba(212, 175, 55, 0.8)); }
+    }
+
+    /* ---------- AUTH LAYOUT ---------- */
+    .auth-container {
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.96) 0%, rgba(250, 248, 245, 0.98) 100%);
+      border-radius: 24px;
+      border: 2px solid rgba(212, 175, 55, 0.4);
+      padding: 32px 28px 36px;
+      box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.8);
+      backdrop-filter: blur(10px);
+    }
+
+    .auth-heading {
+      text-align: center;
+      font-family: 'Orbitron', sans-serif;
+      font-size: clamp(22px, 3vw, 28px);
+      font-weight: 700;
+      color: #b8860b;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin: 0 0 24px;
+    }
+
+    /* ---------- TABS (LOGIN / SIGNUP SWITCH) ---------- */
+    .auth-tabs {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 28px;
+      flex-wrap: wrap;
+    }
+
+    .auth-tab {
+      padding: 10px 20px;
+      border-radius: 999px;
+      border: 2px solid rgba(212, 175, 55, 0.4);
+      background: rgba(255, 255, 255, 0.85);
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.25s;
+    }
+
+    .auth-tab.active {
+      background: linear-gradient(135deg, #d4af37 0%, #f4d03f 100%);
+      color: #0a0e27;
+      box-shadow: 0 4px 18px rgba(212, 175, 55, 0.5);
+      border-color: rgba(212, 175, 55, 0.8);
+    }
+
+    /* ---------- TWO-COLUMN LAYOUT ---------- */
+    .auth-columns {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 28px;
+    }
+
+    /* On small screens, stack login and signup */
+    @media (max-width: 800px) {
+      .auth-columns {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .auth-section-card {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 20px;
+      border: 2px solid rgba(212, 175, 55, 0.3);
+      padding: 24px 22px 26px;
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08);
+      transition: all 0.3s;
+    }
+
+    .auth-section-card.active {
+      box-shadow:
+        0 10px 32px rgba(0, 0, 0, 0.2),
+        0 0 32px rgba(212, 175, 55, 0.25);
+      border-color: rgba(212, 175, 55, 0.7);
+      transform: translateY(-4px);
+    }
+
+    .auth-section-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #b8860b;
+      font-family: 'Orbitron', sans-serif;
+      margin: 0 0 10px;
+      letter-spacing: 1px;
+    }
+
+    .auth-section-text {
+      margin: 0 0 18px;
+      font-size: 15px;
+      color: #5d6d7e;
+      line-height: 1.6;
+    }
+
+    /* ---------- FORMS ---------- */
+    .form-group {
+      margin-bottom: 18px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #34495e;
+    }
+
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 11px 14px;
+      background: rgba(255, 255, 255, 0.95);
+      border: 2px solid rgba(212, 175, 55, 0.3);
+      border-radius: 10px;
+      font-size: 14px;
+      font-family: 'Rajdhani', sans-serif;
+      color: #2c3e50;
+      outline: none;
+      transition: all 0.25s;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+      border-color: rgba(212, 175, 55, 0.7);
+      box-shadow: 0 0 18px rgba(212, 175, 55, 0.3);
+    }
+
+    .form-inline {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      color: #34495e;
+      margin-bottom: 10px;
+    }
+
+    .form-inline input[type="checkbox"] {
+      width: auto;
+      margin: 0;
+      cursor: pointer;
+    }
+
+    .form-inline a {
+      color: #b8860b;
+      text-decoration: none;
+    }
+
+    .form-inline a:hover {
+      text-decoration: underline;
+    }
+
+    .form-actions {
+      margin-top: 16px;
+    }
+
+    .primary-btn {
+      width: 100%;
+      padding: 12px;
+      border-radius: 12px;
+      border: none;
+      cursor: pointer;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      background: linear-gradient(135deg, #d4af37 0%, #f4d03f 100%);
+      color: #0a0e27;
+      box-shadow: 0 4px 18px rgba(212, 175, 55, 0.4);
+      transition: all 0.25s;
+    }
+
+    .primary-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 26px rgba(212, 175, 55, 0.6);
+      background: linear-gradient(135deg, #f4d03f 0%, #d4af37 100%);
+    }
+
+    .auth-meta {
+      margin-top: 14px;
+      font-size: 14px;
+      color: #5d6d7e;
+    }
+
+    .auth-meta a {
+      color: #b8860b;
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .auth-meta a:hover {
+      text-decoration: underline;
+    }
+
+    /* ---------- FOOTER ---------- */
+    footer {
+      margin-top: 40px;
+      text-align: center;
+      padding: 18px;
+      font-size: 14px;
+      color: #5d6d7e;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(250, 248, 245, 0.95) 100%);
+      border-radius: 16px;
+      border: 2px solid rgba(212, 175, 55, 0.3);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    }
+
+    footer a {
+      color: #b8860b;
+      text-decoration: none;
+      margin: 0 4px;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+
+    /* ---------- RESPONSIVE ---------- */
+    @media (max-width: 600px) {
+      .auth-container {
+        padding: 24px 18px 28px;
+      }
+
+      .header {
+        padding: 22px 16px;
+        margin-top: 12px;
+      }
+
+      .header h1 {
+        font-size: clamp(26px, 8vw, 36px);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <!-- GLOBAL HEADER -->
+    <header class="header">
+      <h1>Meta Real Estate</h1>
+      <p>Smart property matching for buyers, sellers, investors, renters, and agents.</p>
+    </header>
+
+    <!--MAIN AUTH CONTENT -->
+    <main>
+      <section id="auth" class="auth-container" aria-labelledby="auth-heading">
+        <h2 id="auth-heading" class="auth-heading">Login &amp; Create Your Account</h2>
+
+        <!-- TABS TO SWITCH BETWEEN LOGIN / SIGNUP VISUALLY -->
+        <div class="auth-tabs">
+          <button type="button" class="auth-tab active" data-target="login-section">Login</button>
+          <button type="button" class="auth-tab" data-target="signup-section">Create Account</button>
+        </div>
+
+        <!-- TWO COLUMN LAYOUT (LOGIN / SIGNUP) -->
+        <div class="auth-columns">
+          <!-- LOGIN SECTION -->
+          <section id="login-section" class="auth-section-card active" aria-labelledby="login-heading">
+            <h3 id="login-heading" class="auth-section-title">Login</h3>
+            <p class="auth-section-text">
+              Sign in to access your saved searches, manage your listings, and view your personalized property matches.
+            </p>
+
+            <!-- Placeholder: login error or success message will appear here -->
+
+            <form action="index.html" method="get" autocomplete="on">
+              <div class="form-group">
+                <label for="login-email">Email address</label>
+                <input
+                  type="email"
+                  id="login-email"
+                  name="email"
+                  required
+                  autocomplete="email"
+                >
+              </div>
+
+              <div class="form-group">
+                <label for="login-password">Password</label>
+                <input
+                  type="password"
+                  id="login-password"
+                  name="password"
+                  required
+                  autocomplete="current-password"
+                >
+              </div>
+
+              <div class="form-inline">
+                <input
+                  type="checkbox"
+                  id="remember-me"
+                  name="remember"
+                >
+                <label for="remember-me">Remember me on this device</label>
+              </div>
+
+              <div class="form-inline">
+                <a href="#">Forgot your password?</a>
+                <!-- You can replace # with /forgot-password when backend is ready -->
+              </div>
+
+              <div class="form-actions">
+                <button type="submit" class="primary-btn">Log In</button>
+              </div>
+            </form>
+
+            <p class="auth-meta">
+              Don’t have an account yet?
+              <a href="#signup-section" data-switch-tab="signup-section">Create one</a>
+            </p>
+          </section>
+
+          <!-- SIGN UP SECTION -->
+          <section id="signup-section" class="auth-section-card" aria-labelledby="signup-heading">
+            <h3 id="signup-heading" class="auth-section-title">Create Account</h3>
+            <p class="auth-section-text">
+              Create your Meta Real Estate account to save your favorite properties, manage your listings,
+              and receive AI-powered matches tailored to your goals.
+            </p>
+
+            <!-- Placeholder: signup error or success message will appear here -->
+
+            <form action="index.html" method="get" autocomplete="on">
+              <div class="form-group">
+                <label for="first-name">First name</label>
+                <input
+                  type="text"
+                  id="first-name"
+                  name="first_name"
+                  required
+                  autocomplete="given-name"
+                >
+              </div>
+
+              <div class="form-group">
+                <label for="last-name">Last name</label>
+                <input
+                  type="text"
+                  id="last-name"
+                  name="last_name"
+                  required
+                  autocomplete="family-name"
+                >
+              </div>
+
+              <div class="form-group">
+                <label for="signup-email">Email address</label>
+                <input
+                  type="email"
+                  id="signup-email"
+                  name="email"
+                  required
+                  autocomplete="email"
+                >
+              </div>
+
+              <div class="form-group">
+                <label for="phone">Phone number (optional)</label>
+                <input
+                  type="tel"
+                  id="phone"
+                  name="phone"
+                  autocomplete="tel"
+                >
+              </div>
+
+              <div class="form-group">
+                <label for="role">I am</label>
+                <select
+                  id="role"
+                  name="role"
+                >
+                  <option value="">Select your role (optional)</option>
+                  <option value="buyer">Buyer</option>
+                  <option value="seller">Seller</option>
+                  <option value="investor">Investor</option>
+                  <option value="renter">Renter</option>
+                  <option value="agent">Agent</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="signup-password">Password</label>
+                <input
+                  type="password"
+                  id="signup-password"
+                  name="password"
+                  required
+                  autocomplete="new-password"
+                >
+              </div>
+
+              <div class="form-group">
+                <label for="confirm-password">Confirm password</label>
+                <input
+                  type="password"
+                  id="confirm-password"
+                  name="confirm_password"
+                  required
+                  autocomplete="new-password"
+                >
+              </div>
+
+              <div class="form-inline">
+                <input
+                  type="checkbox"
+                  id="terms"
+                  name="terms"
+                  required
+                >
+                <label for="terms">
+                  I agree to the
+                  <a href="#">Terms &amp; Conditions</a>
+                  and
+                  <a href="#">Privacy Policy</a>.
+                  <!-- Replace # with /terms and /privacy when backend pages exist -->
+                </label>
+              </div>
+
+              <div class="form-actions">
+                <button type="submit" class="primary-btn">Create Account</button>
+              </div>
+            </form>
+
+            <p class="auth-meta">
+              Already have an account?
+              <a href="#login-section" data-switch-tab="login-section">Log in</a>
+            </p>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    
+    <footer>
+      <p>&copy; Meta Real Estate. All rights reserved.</p>
+      <p>
+        <a href="#">Terms</a> |
+        <a href="#">Privacy</a>
+      </p>
+    </footer>
+  </div>
+
+  <!--SMALL JS: TAB SWITCHING -->
+  <script>
+    //  JS 
+    const tabs = document.querySelectorAll('.auth-tab');
+    const cards = {
+      'login-section': document.getElementById('login-section'),
+      'signup-section': document.getElementById('signup-section')
+    };
+
+    function activateSection(targetId) {
+      // Switch active tab
+      tabs.forEach(tab => {
+        if (tab.dataset.target === targetId) {
+          tab.classList.add('active');
+        } else {
+          tab.classList.remove('active');
+        }
+      });
+
+      // Switch active card
+      Object.entries(cards).forEach(([id, card]) => {
+        if (id === targetId) {
+          card.classList.add('active');
+        } else {
+          card.classList.remove('active');
+        }
+      });
+
+      // Scroll to top of auth container on small screens
+      const authContainer = document.getElementById('auth');
+      if (authContainer) {
+        authContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+
+    // Tab buttons
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        const targetId = tab.dataset.target;
+        activateSection(targetId);
+      });
+    });
+
+    document.querySelectorAll('[data-switch-tab]').forEach(link => {
+      link.addEventListener('click', (event) => {
+        event.preventDefault();
+        const targetId = link.getAttribute('data-switch-tab');
+        activateSection(targetId);
+      });
+    });
+  </script>
+</body>
+</html>
+
+        
+   
