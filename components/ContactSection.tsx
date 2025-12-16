@@ -16,6 +16,8 @@ export default function ContactSection() {
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -24,9 +26,13 @@ export default function ContactSection() {
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: "" }));
     }
+    // Clear submit error when user starts typing
+    if (submitError) {
+      setSubmitError(null);
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const newErrors: Record<string, string> = {};
 
@@ -51,14 +57,47 @@ export default function ContactSection() {
       return;
     }
 
-    // SECURITY NOTE: In production, this should send to a backend API
-    // that validates and sanitizes the input before processing
-    console.log("Contact form submitted:", formData);
-    setSubmitted(true);
-    setFormData({ name: "", email: "", message: "" });
-    
-    // Reset submitted message after 5 seconds
-    setTimeout(() => setSubmitted(false), 5000);
+    // Clear previous errors
+    setSubmitError(null);
+    setIsSubmitting(true);
+
+    try {
+      // Submit to Formspree
+      const response = await fetch("https://formspree.io/f/xnnoglde", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          message: formData.message,
+        }),
+      });
+
+      if (response.ok) {
+        // Success - show thank you message
+        setSubmitted(true);
+        setFormData({ name: "", email: "", message: "" });
+        setErrors({});
+        
+        // Reset submitted message after 5 seconds
+        setTimeout(() => setSubmitted(false), 5000);
+      } else {
+        // Handle error response
+        const errorData = await response.json().catch(() => ({}));
+        setSubmitError(
+          errorData.error || "Failed to send message. Please try again later."
+        );
+      }
+    } catch (error) {
+      // Network or other error
+      console.error("Form submission error:", error);
+      setSubmitError("Network error. Please check your connection and try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -134,11 +173,18 @@ export default function ContactSection() {
                 {errors.message && <p className="text-red-500 text-sm mt-1">{errors.message}</p>}
               </div>
 
+              {submitError && (
+                <div className="bg-red-50 border-2 border-red-500 rounded-xl p-4">
+                  <p className="text-red-600 text-sm text-center">{submitError}</p>
+                </div>
+              )}
+
               <button
                 type="submit"
-                className="w-full px-8 py-4 bg-gradient-to-r from-gold to-gold-light text-gray-900 font-bold rounded-xl hover:shadow-xl hover:scale-105 transition-all"
+                disabled={isSubmitting}
+                className="w-full px-8 py-4 bg-gradient-to-r from-gold to-gold-light text-gray-900 font-bold rounded-xl hover:shadow-xl hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Send Message
+                {isSubmitting ? "Sending..." : "Send Message"}
               </button>
             </form>
           )}
