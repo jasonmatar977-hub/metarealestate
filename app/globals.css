@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&display=swap');
+
+:root {
+  --font-orbitron: 'Orbitron', sans-serif;
+  --font-rajdhani: 'Rajdhani', sans-serif;
+}
+
+@layer base {
+  body {
+    @apply font-rajdhani bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50 text-gray-800;
+  }
+}
+
+@layer utilities {
+  .glass {
+    @apply bg-white/90 backdrop-blur-lg border border-gold/40 shadow-lg;
+  }
+  
+  .glass-dark {
+    @apply bg-white/95 backdrop-blur-xl border-2 border-gold/50 shadow-xl;
+  }
+}
+
