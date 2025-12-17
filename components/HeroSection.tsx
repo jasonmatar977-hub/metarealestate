@@ -6,6 +6,7 @@
  */
 
 import Link from "next/link";
+import CountryFlags from "@/components/CountryFlags";
 
 export default function HeroSection() {
   return (
@@ -17,26 +18,31 @@ export default function HeroSection() {
       </div>
 
       <div className="relative z-10 max-w-5xl mx-auto text-center">
-        <h1 className="font-orbitron text-5xl md:text-7xl font-black mb-6 bg-gradient-to-r from-gold via-gold-light to-gold bg-clip-text text-transparent animate-pulse">
+        <h1 className="font-orbitron text-4xl sm:text-5xl md:text-7xl font-black mb-6 bg-gradient-to-r from-gold via-gold-light to-gold bg-clip-text text-transparent animate-pulse px-4">
           META REAL ESTATE
         </h1>
-        <p className="text-xl md:text-2xl text-gray-700 mb-4 font-semibold">
+        <p className="text-lg sm:text-xl md:text-2xl text-gray-700 mb-4 font-semibold px-4">
           The Future of Property Discovery
         </p>
-        <p className="text-lg md:text-xl text-gray-600 mb-12 max-w-2xl mx-auto">
+        <p className="text-base sm:text-lg md:text-xl text-gray-600 mb-8 max-w-2xl mx-auto px-4">
           Discover properties, gain insights, and connect with opportunities through cutting-edge AI technology
         </p>
         
-        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+        {/* Country Flags Selector */}
+        <div className="mb-8 flex justify-center px-4">
+          <CountryFlags />
+        </div>
+        
+        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center px-4">
           <Link
             href="/login"
-            className="px-8 py-4 bg-white border-2 border-gold text-gold font-bold rounded-xl hover:bg-gold hover:text-gray-900 transition-all text-lg shadow-lg hover:shadow-xl hover:scale-105"
+            className="w-full sm:w-auto px-8 py-4 bg-white border-2 border-gold text-gold font-bold rounded-xl hover:bg-gold hover:text-gray-900 transition-all text-lg shadow-lg hover:shadow-xl hover:scale-105"
           >
             Login
           </Link>
           <Link
             href="/register"
-            className="px-8 py-4 bg-gradient-to-r from-gold to-gold-light text-gray-900 font-bold rounded-xl hover:shadow-xl hover:scale-105 transition-all text-lg shadow-lg"
+            className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-gold to-gold-light text-gray-900 font-bold rounded-xl hover:shadow-xl hover:scale-105 transition-all text-lg shadow-lg"
           >
             Create Account
           </Link>
