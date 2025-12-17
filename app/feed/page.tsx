@@ -9,11 +9,12 @@
  * All post content is treated as untrusted and rendered safely
  */
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import Navbar from "@/components/Navbar";
 import PostCard from "@/components/PostCard";
+import CreatePost from "@/components/CreatePost";
 
 // Mock feed data
 // SECURITY NOTE: In production, this should come from a secure backend API
@@ -65,9 +66,21 @@ const MOCK_POSTS = [
   },
 ];
 
+interface Post {
+  id: number;
+  username: string;
+  avatar: string;
+  timestamp: string;
+  content: string;
+  imageUrl?: string;
+  likes: number;
+  comments: number;
+}
+
 export default function FeedPage() {
   const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
+  const [posts, setPosts] = useState<Post[]>(MOCK_POSTS);
 
   useEffect(() => {
     // SECURITY: Front-end route protection
@@ -111,18 +124,29 @@ export default function FeedPage() {
           <h1 className="font-orbitron text-4xl md:text-5xl font-bold text-center mb-4 text-gold-dark">
             News Feed
           </h1>
-          <p className="text-center text-gray-600 mb-12 text-lg">
+          <p className="text-center text-gray-600 mb-8 text-lg">
             Stay updated with the latest from our community
           </p>
 
+          {/* Create Post UI - Only for authenticated users */}
+          {isAuthenticated && (
+            <CreatePost
+              onPostCreated={(newPost) => {
+                // Add new post to the beginning of the feed
+                setPosts((prev) => [newPost, ...prev]);
+              }}
+            />
+          )}
+
           <div className="space-y-6">
-            {MOCK_POSTS.map((post) => (
+            {posts.map((post) => (
               <PostCard
                 key={post.id}
                 username={post.username}
                 avatar={post.avatar}
                 timestamp={post.timestamp}
                 content={post.content}
+                imageUrl={post.imageUrl}
                 likes={post.likes}
                 comments={post.comments}
               />
