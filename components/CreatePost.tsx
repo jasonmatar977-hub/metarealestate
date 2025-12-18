@@ -4,22 +4,15 @@
  * Create Post Component
  * Facebook/Instagram-style post creation UI
  * Only visible when user is authenticated
+ * Posts are saved to Supabase
  */
 
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabaseClient";
 
 interface CreatePostProps {
-  onPostCreated: (post: {
-    id: number;
-    username: string;
-    avatar: string;
-    timestamp: string;
-    content: string;
-    imageUrl?: string;
-    likes: number;
-    comments: number;
-  }) => void;
+  onPostCreated: () => void; // Callback to refresh feed
 }
 
 export default function CreatePost({ onPostCreated }: CreatePostProps) {
@@ -27,6 +20,7 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
   const [content, setContent] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Get user initials for avatar
   const getInitials = () => {
@@ -42,32 +36,36 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!content.trim() || isSubmitting) return;
+    if (!content.trim() || isSubmitting || !user) return;
 
     setIsSubmitting(true);
+    setError(null);
 
-    // Simulate API call delay
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    try {
+      // Insert post into Supabase
+      const { error: insertError } = await supabase
+        .from('posts')
+        .insert({
+          user_id: user.id,
+          content: content.trim(),
+        });
 
-    // Create new post
-    const newPost = {
-      id: Date.now(), // Simple ID generation
-      username: user?.name || user?.username || "User",
-      avatar: getInitials(),
-      timestamp: "Just now",
-      content: content.trim(),
-      imageUrl: imageUrl.trim() || undefined,
-      likes: 0,
-      comments: 0,
-    };
+      if (insertError) {
+        throw insertError;
+      }
 
-    // Callback to add post to feed
-    onPostCreated(newPost);
-
-    // Reset form
-    setContent("");
-    setImageUrl("");
-    setIsSubmitting(false);
+      // Reset form
+      setContent("");
+      setImageUrl("");
+      
+      // Refresh feed
+      onPostCreated();
+    } catch (err: any) {
+      console.error('Error creating post:', err);
+      setError(err.message || 'Failed to create post. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (!user) {
@@ -86,21 +84,30 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
         <form onSubmit={handleSubmit} className="flex-1">
           <textarea
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            onChange={(e) => {
+              setContent(e.target.value);
+              setError(null);
+            }}
             placeholder="What's on your mind?"
             rows={3}
             className="w-full px-4 py-3 rounded-xl border-2 border-gold/40 focus:border-gold focus:outline-none resize-none mb-3"
             maxLength={500}
           />
 
-          {/* Image URL Input (Optional) */}
-          <input
+          {/* Image URL Input (Optional) - For future use */}
+          {/* <input
             type="url"
             value={imageUrl}
             onChange={(e) => setImageUrl(e.target.value)}
             placeholder="Image URL (optional)"
             className="w-full px-4 py-2 rounded-xl border-2 border-gold/40 focus:border-gold focus:outline-none mb-3 text-sm"
-          />
+          /> */}
+
+          {error && (
+            <div className="mb-3 p-3 bg-red-50 border-2 border-red-500 rounded-xl">
+              <p className="text-red-600 text-sm">{error}</p>
+            </div>
+          )}
 
           {/* Character Count */}
           <div className="flex items-center justify-between">
@@ -118,4 +125,3 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
     </div>
   );
 }
-

@@ -1,25 +1,22 @@
 "use client";
 
 /**
- * Authentication Context
+ * Authentication Context with Supabase
  * 
- * SECURITY NOTE: This is front-end only authentication state.
- * Real authentication must be implemented on the backend with:
- * - JWT tokens or session management
- * - Secure password hashing (bcrypt, argon2)
- * - CSRF protection
- * - Rate limiting
- * - Server-side session validation
- * 
- * This context is for UI state management only.
+ * Handles user authentication using Supabase Auth
+ * Manages session state and user profile data
  */
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { supabase } from '@/lib/supabaseClient';
+import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 interface User {
+  id: string;
   email: string;
   name: string;
   username: string;
+  displayName?: string;
 }
 
 interface AuthContextType {
@@ -28,7 +25,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<boolean>;
   register: (userData: RegisterData) => Promise<boolean>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 interface RegisterData {
@@ -48,131 +45,156 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Check for existing auth state on mount (from localStorage)
-  // Guard with window check for SSR safety
+  // Load user profile from Supabase
+  const loadUserProfile = async (supabaseUser: SupabaseUser): Promise<User | null> => {
+    try {
+      // Get profile from profiles table
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('display_name')
+        .eq('id', supabaseUser.id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+        console.error('Error loading profile:', error);
+      }
+
+      return {
+        id: supabaseUser.id,
+        email: supabaseUser.email || '',
+        name: profile?.display_name || supabaseUser.user_metadata?.full_name || supabaseUser.email?.split('@')[0] || 'User',
+        username: supabaseUser.user_metadata?.username || supabaseUser.email?.split('@')[0] || 'user',
+        displayName: profile?.display_name,
+      };
+    } catch (error) {
+      console.error('Error loading user profile:', error);
+      return null;
+    }
+  };
+
+  // Check for existing session on mount
   useEffect(() => {
     if (typeof window === "undefined") {
       setIsLoading(false);
       return;
     }
 
-    try {
-      const storedAuth = localStorage.getItem('auth');
-      if (storedAuth) {
-        try {
-          const authData = JSON.parse(storedAuth);
-          if (authData.isAuthenticated && authData.user) {
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        loadUserProfile(session.user).then((userData) => {
+          if (userData) {
             setIsAuthenticated(true);
-            setUser(authData.user);
+            setUser(userData);
           }
-        } catch (error) {
-          // Invalid stored data, clear it
-          if (typeof window !== "undefined") {
-            localStorage.removeItem('auth');
-          }
-        }
+        });
       }
-    } catch (error) {
-      console.error("Error loading auth state:", error);
-    } finally {
       setIsLoading(false);
-    }
+    });
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        const userData = await loadUserProfile(session.user);
+        if (userData) {
+          setIsAuthenticated(true);
+          setUser(userData);
+        }
+      } else {
+        setIsAuthenticated(false);
+        setUser(null);
+      }
+      setIsLoading(false);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   /**
-   * Mock login function
-   * SECURITY: In production, this should call a backend API
-   * that validates credentials and returns a secure token.
+   * Login with email and password using Supabase
    */
   const login = async (email: string, password: string): Promise<boolean> => {
-    // TODO: Replace with real API call
-    // const response = await fetch('/api/auth/login', {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({ email, password }),
-    // });
-    // if (!response.ok) return false;
-    // const { token, user } = await response.json();
-    // Store token securely (httpOnly cookie preferred)
-    
-    // Mock implementation for front-end only
-    // In real app, backend would verify credentials
-    const mockUser: User = {
-      email,
-      name: "User",
-      username: email.split('@')[0],
-    };
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    setIsAuthenticated(true);
-    setUser(mockUser);
-    
-    // Guard localStorage access
-    if (typeof window !== "undefined") {
-      try {
-        localStorage.setItem('auth', JSON.stringify({ isAuthenticated: true, user: mockUser }));
-      } catch (error) {
-        console.error("Error saving auth state:", error);
+      if (error) {
+        console.error('Login error:', error);
+        return false;
       }
+
+      if (data.user) {
+        const userData = await loadUserProfile(data.user);
+        if (userData) {
+          setIsAuthenticated(true);
+          setUser(userData);
+          return true;
+        }
+      }
+
+      return false;
+    } catch (error) {
+      console.error('Login error:', error);
+      return false;
     }
-    
-    return true;
   };
 
   /**
-   * Mock register function
-   * SECURITY: In production, this should call a backend API
-   * that validates data, hashes passwords, and creates user account.
+   * Register new user with Supabase
    */
   const register = async (userData: RegisterData): Promise<boolean> => {
-    // TODO: Replace with real API call
-    // const response = await fetch('/api/auth/register', {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify(userData),
-    // });
-    // if (!response.ok) return false;
-    // const { token, user } = await response.json();
-    
-    // Mock implementation
-    const newUser: User = {
-      email: userData.email,
-      name: userData.fullName,
-      username: userData.username,
-    };
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: userData.email,
+        password: userData.password,
+        options: {
+          data: {
+            full_name: userData.fullName,
+            username: userData.username,
+          },
+        },
+      });
 
-    setIsAuthenticated(true);
-    setUser(newUser);
-    
-    // Guard localStorage access
-    if (typeof window !== "undefined") {
-      try {
-        localStorage.setItem('auth', JSON.stringify({ isAuthenticated: true, user: newUser }));
-      } catch (error) {
-        console.error("Error saving auth state:", error);
+      if (error) {
+        console.error('Registration error:', error);
+        return false;
       }
+
+      if (data.user) {
+        // Profile will be created automatically by trigger
+        // But we can update it with additional info if needed
+        const userProfile = await loadUserProfile(data.user);
+        if (userProfile) {
+          setIsAuthenticated(true);
+          setUser(userProfile);
+          return true;
+        }
+      }
+
+      return false;
+    } catch (error) {
+      console.error('Registration error:', error);
+      return false;
     }
-    
-    return true;
   };
 
   /**
-   * Logout function
-   * SECURITY: In production, this should also call backend to invalidate session/token
+   * Logout from Supabase
    */
-  const logout = () => {
-    setIsAuthenticated(false);
-    setUser(null);
-    
-    // Guard localStorage access
-    if (typeof window !== "undefined") {
-      try {
-        localStorage.removeItem('auth');
-      } catch (error) {
-        console.error("Error clearing auth state:", error);
-      }
+  const logout = async (): Promise<void> => {
+    try {
+      await supabase.auth.signOut();
+      setIsAuthenticated(false);
+      setUser(null);
+    } catch (error) {
+      console.error('Logout error:', error);
     }
-    
-    // TODO: Call backend logout endpoint to invalidate token
   };
 
   return (
@@ -192,4 +214,3 @@ export function useAuth() {
   }
   return context;
 }
-
