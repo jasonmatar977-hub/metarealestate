@@ -65,30 +65,27 @@ export default function ChatPage() {
         throw new Error("Message too long");
       }
 
-      // Call API route
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          message: userMessage,
-          history: newMessages.slice(-10), // Send last 10 messages for context
-        }),
-      });
+      // Mock chatbot response (OpenAI disabled for now)
+      // Simulate thinking delay
+      await new Promise((resolve) => setTimeout(resolve, 500 + Math.random() * 1000));
 
-      if (!response.ok) {
-        throw new Error("Failed to get response");
-      }
-
-      const data = await response.json();
+      // Simple mock responses based on keywords
+      let response = "I'm a real estate assistant. How can I help you with property searches, buying, selling, or investing today?";
       
-      // SECURITY: Validate response before displaying
-      if (data.message && typeof data.message === "string") {
-        setMessages([...newMessages, { role: "assistant", content: data.message }]);
-      } else {
-        throw new Error("Invalid response format");
+      const lowerMessage = userMessage.toLowerCase();
+      if (lowerMessage.includes("property") || lowerMessage.includes("house") || lowerMessage.includes("home")) {
+        response = "I can help you find properties! Check out our listings page to browse available properties. You can filter by location, price, and property type.";
+      } else if (lowerMessage.includes("buy") || lowerMessage.includes("purchase")) {
+        response = "Great! To buy a property, start by browsing our listings. You can also use the search filters to find properties that match your criteria.";
+      } else if (lowerMessage.includes("sell")) {
+        response = "To sell your property, you'll need to create a listing. Contact our team through the contact form for assistance with listing your property.";
+      } else if (lowerMessage.includes("invest") || lowerMessage.includes("investment")) {
+        response = "Real estate investment is a great strategy! Browse our listings and look for properties with good potential. Consider location, market trends, and rental yields.";
+      } else if (lowerMessage.includes("help") || lowerMessage.includes("how")) {
+        response = "I can help you with: finding properties, understanding the buying process, learning about selling, and investment advice. What would you like to know more about?";
       }
+
+      setMessages([...newMessages, { role: "assistant", content: response }]);
     } catch (error) {
       console.error("Chat error:", error);
       setMessages([

@@ -103,15 +103,15 @@ export default function ListingsPage() {
     <main className="min-h-screen">
       <Navbar />
       <div className="pt-24 pb-20 px-4">
-        <div className="max-w-7xl mx-auto">
-          <h1 className="font-orbitron text-4xl md:text-5xl font-bold text-center mb-4 text-gold-dark">
+        <div className="max-w-7xl mx-auto w-full">
+          <h1 className="font-orbitron text-3xl sm:text-4xl md:text-5xl font-bold text-center mb-4 text-gold-dark px-4">
             Property Listings
           </h1>
-          <p className="text-center text-gray-600 mb-12 text-lg">
+          <p className="text-center text-gray-600 mb-8 sm:mb-12 text-base sm:text-lg px-4">
             Discover your perfect property from our curated selection
           </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {MOCK_PROPERTIES.map((property) => (
               <PropertyCard
                 key={property.id}
