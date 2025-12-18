@@ -18,14 +18,13 @@ interface CreatePostProps {
 export default function CreatePost({ onPostCreated }: CreatePostProps) {
   const { user } = useAuth();
   const [content, setContent] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Get user initials for avatar
   const getInitials = () => {
     if (!user) return "U";
-    const name = user.name || user.username || user.email;
+    const name = user.displayName || user.name || user.username || user.email;
     return name
       .split(" ")
       .map((n) => n[0])
@@ -42,27 +41,62 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
     setError(null);
 
     try {
+      console.log("=== CREATING POST ===");
+      console.log("User ID:", user.id);
+      console.log("Content:", content.trim());
+
+      // Get current session to ensure we have the user_id
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error("Session error:", sessionError);
+        throw new Error("Not authenticated. Please log in again.");
+      }
+
+      if (!session?.user?.id) {
+        console.error("No user ID in session");
+        throw new Error("Not authenticated. Please log in again.");
+      }
+
+      const userId = session.user.id;
+      console.log("Using user_id from session:", userId);
+
       // Insert post into Supabase
-      const { error: insertError } = await supabase
+      const { data, error: insertError } = await supabase
         .from('posts')
         .insert({
-          user_id: user.id,
+          user_id: userId,
           content: content.trim(),
-        });
+        })
+        .select()
+        .single();
 
       if (insertError) {
+        console.error("=== CREATE POST ERROR ===");
+        console.error("Full error:", insertError);
+        console.error("Error message:", insertError.message);
+        console.error("Error details:", insertError.details);
+        console.error("Error hint:", insertError.hint);
+        console.error("Error code:", insertError.code);
         throw insertError;
       }
 
+      console.log("Post created successfully:", data);
+
       // Reset form
       setContent("");
-      setImageUrl("");
       
       // Refresh feed
       onPostCreated();
     } catch (err: any) {
-      console.error('Error creating post:', err);
-      setError(err.message || 'Failed to create post. Please try again.');
+      console.error('=== CREATE POST CATCH ERROR ===');
+      console.error('Error object:', err);
+      console.error('Error message:', err?.message);
+      console.error('Error details:', err?.details);
+      console.error('Error hint:', err?.hint);
+      console.error('Error code:', err?.code);
+      
+      setError(err?.message || 'Failed to create post. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -93,15 +127,6 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
             className="w-full px-4 py-3 rounded-xl border-2 border-gold/40 focus:border-gold focus:outline-none resize-none mb-3"
             maxLength={500}
           />
-
-          {/* Image URL Input (Optional) - For future use */}
-          {/* <input
-            type="url"
-            value={imageUrl}
-            onChange={(e) => setImageUrl(e.target.value)}
-            placeholder="Image URL (optional)"
-            className="w-full px-4 py-2 rounded-xl border-2 border-gold/40 focus:border-gold focus:outline-none mb-3 text-sm"
-          /> */}
 
           {error && (
             <div className="mb-3 p-3 bg-red-50 border-2 border-red-500 rounded-xl">

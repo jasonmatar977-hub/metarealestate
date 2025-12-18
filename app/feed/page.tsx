@@ -34,59 +34,114 @@ export default function FeedPage() {
   const router = useRouter();
   const [posts, setPosts] = useState<Post[]>([]);
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Load posts from Supabase
+  // Load posts from Supabase with fallback approach
   const loadPosts = async () => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || !user) return;
 
     try {
       setIsLoadingPosts(true);
+      setError(null);
 
-      // Fetch posts with profile data and like counts
+      console.log("=== LOADING POSTS ===");
+      console.log("User authenticated:", isAuthenticated);
+      console.log("User ID:", user?.id);
+
+      // Step 1: Fetch posts (simple query, no join)
       const { data: postsData, error: postsError } = await supabase
         .from('posts')
-        .select(`
-          id,
-          user_id,
-          content,
-          created_at,
-          profiles:user_id (
-            display_name
-          )
-        `)
+        .select('id, user_id, content, created_at')
         .order('created_at', { ascending: false })
         .limit(50);
 
       if (postsError) {
+        console.error("=== POSTS ERROR ===");
+        console.error("Full error:", postsError);
+        console.error("Error message:", postsError.message);
+        console.error("Error details:", postsError.details);
+        console.error("Error hint:", postsError.hint);
+        console.error("Error code:", postsError.code);
         throw postsError;
       }
 
-      // Get like counts and user's likes
-      if (postsData && user) {
-        const postIds = postsData.map((p) => p.id);
-        
-        // Get all likes for these posts
-        const { data: likesData } = await supabase
-          .from('likes')
-          .select('post_id, user_id')
-          .in('post_id', postIds);
+      console.log("Posts fetched:", postsData?.length || 0);
 
-        // Count likes per post and check if user liked
-        const postsWithLikes = postsData.map((post) => {
-          const postLikes = likesData?.filter((l) => l.post_id === post.id) || [];
-          return {
-            ...post,
-            likes_count: postLikes.length,
-            user_liked: postLikes.some((l) => l.user_id === user.id),
-          };
-        });
-
-        setPosts(postsWithLikes as Post[]);
-      } else {
-        setPosts(postsData || []);
+      if (!postsData || postsData.length === 0) {
+        setPosts([]);
+        setIsLoadingPosts(false);
+        return;
       }
-    } catch (error) {
-      console.error('Error loading posts:', error);
+
+      // Step 2: Get unique user IDs from posts
+      const userIds = [...new Set(postsData.map((p) => p.user_id))];
+      console.log("Unique user IDs:", userIds);
+
+      // Step 3: Fetch profiles for these users
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, display_name')
+        .in('id', userIds);
+
+      if (profilesError) {
+        console.error("=== PROFILES ERROR ===");
+        console.error("Full error:", profilesError);
+        console.error("Error message:", profilesError.message);
+        console.error("Error details:", profilesError.details);
+        console.error("Error hint:", profilesError.hint);
+        console.error("Error code:", profilesError.code);
+        // Continue without profiles if error
+      }
+
+      console.log("Profiles fetched:", profilesData?.length || 0);
+
+      // Step 4: Get like counts and user's likes
+      const postIds = postsData.map((p) => p.id);
+      const { data: likesData, error: likesError } = await supabase
+        .from('likes')
+        .select('post_id, user_id')
+        .in('post_id', postIds);
+
+      if (likesError) {
+        console.error("=== LIKES ERROR ===");
+        console.error("Full error:", likesError);
+        console.error("Error message:", likesError.message);
+        console.error("Error details:", likesError.details);
+        console.error("Error hint:", likesError.hint);
+        console.error("Error code:", likesError.code);
+        // Continue without likes if error
+      }
+
+      // Step 5: Merge data
+      const profilesMap = new Map(
+        (profilesData || []).map((p) => [p.id, p])
+      );
+
+      const postsWithData = postsData.map((post) => {
+        const profile = profilesMap.get(post.user_id);
+        const postLikes = (likesData || []).filter((l) => l.post_id === post.id);
+        
+        return {
+          ...post,
+          profile: profile ? { display_name: profile.display_name } : undefined,
+          likes_count: postLikes.length,
+          user_liked: postLikes.some((l) => l.user_id === user.id),
+        };
+      });
+
+      console.log("Posts with merged data:", postsWithData.length);
+      setPosts(postsWithData as Post[]);
+    } catch (error: any) {
+      console.error("=== LOAD POSTS ERROR ===");
+      console.error("Full error object:", error);
+      console.error("Error message:", error?.message);
+      console.error("Error details:", error?.details);
+      console.error("Error hint:", error?.hint);
+      console.error("Error code:", error?.code);
+      console.error("Error stack:", error?.stack);
+      
+      setError(`Failed to load posts: ${error?.message || 'Unknown error'}`);
+      setPosts([]);
     } finally {
       setIsLoadingPosts(false);
     }
@@ -100,10 +155,10 @@ export default function FeedPage() {
   }, [isAuthenticated, isLoading, router]);
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && user) {
       loadPosts();
     }
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, user?.id]);
 
   // Show loading state while checking auth
   if (isLoading) {
@@ -148,7 +203,7 @@ export default function FeedPage() {
   };
 
   // Get user initials
-  const getInitials = (name: string | null | undefined, email: string | undefined) => {
+  const getInitials = (name: string | null | undefined, userId: string) => {
     if (name) {
       return name
         .split(" ")
@@ -157,10 +212,8 @@ export default function FeedPage() {
         .toUpperCase()
         .slice(0, 2);
     }
-    if (email) {
-      return email[0].toUpperCase();
-    }
-    return "U";
+    // Fallback to user ID initials
+    return userId.slice(0, 2).toUpperCase() || "U";
   };
 
   return (
@@ -175,6 +228,19 @@ export default function FeedPage() {
             Stay updated with the latest from our community
           </p>
 
+          {/* Error Message */}
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 border-2 border-red-500 rounded-xl">
+              <p className="text-red-600 text-sm">{error}</p>
+              <button
+                onClick={loadPosts}
+                className="mt-2 text-red-600 hover:text-red-800 text-sm font-semibold underline"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
           {/* Create Post UI - Only for authenticated users */}
           {isAuthenticated && <CreatePost onPostCreated={loadPosts} />}
 
@@ -186,7 +252,13 @@ export default function FeedPage() {
             </div>
           ) : posts.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-gray-600">No posts yet. Be the first to post!</p>
+              <p className="text-gray-600 mb-4">No posts yet. Be the first to post!</p>
+              <button
+                onClick={loadPosts}
+                className="text-gold hover:text-gold-dark font-semibold underline"
+              >
+                Refresh
+              </button>
             </div>
           ) : (
             <div className="space-y-6">
@@ -195,7 +267,7 @@ export default function FeedPage() {
                   key={post.id}
                   postId={post.id}
                   username={post.profile?.display_name || "User"}
-                  avatar={getInitials(post.profile?.display_name, undefined)}
+                  avatar={getInitials(post.profile?.display_name, post.user_id)}
                   timestamp={formatTimestamp(post.created_at)}
                   content={post.content}
                   likes={post.likes_count || 0}
