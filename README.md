@@ -65,7 +65,7 @@ myproject/
 
 - Node.js 18+ installed
 - npm or yarn package manager
-- OpenAI API key (for chatbot functionality)
+- Supabase account and project
 
 ### Installation
 
@@ -77,18 +77,33 @@ myproject/
 2. **Set up environment variables:**
    Create a `.env.local` file in the root directory:
    ```env
-   OPENAI_API_KEY=your_openai_api_key_here
+   NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
    ```
    
-   Get your API key from [OpenAI Platform](https://platform.openai.com/api-keys)
+   Get these values from your Supabase project settings → API
 
-3. **Run the development server:**
+3. **Set up database:**
+   - Open your Supabase project dashboard
+   - Go to SQL Editor
+   - Copy and paste the contents of `supabase/schema.sql`
+   - Run the SQL to create tables and policies
+
+4. **Run the development server:**
    ```bash
    npm run dev
    ```
 
-4. **Open your browser:**
+5. **Open your browser:**
    Navigate to [http://localhost:3000](http://localhost:3000)
+
+### Supabase Setup
+
+See [SUPABASE_SETUP.md](./SUPABASE_SETUP.md) for detailed instructions on:
+- Setting up environment variables
+- Creating database tables
+- Configuring Row Level Security
+- Troubleshooting
 
 ### Build for Production
 
@@ -149,22 +164,31 @@ The following must be implemented on the backend:
 
 ## 🤖 AI Chatbot
 
-The chatbot uses OpenAI's GPT-4o-mini model and is configured to:
-- Answer real estate questions
-- Help with property searches
-- Guide users through the platform
-- Provide market insights
+The chatbot currently uses mock responses (OpenAI integration disabled for deployment).
+- Answers real estate questions
+- Helps with property searches
+- Guides users through the platform
+- Provides basic market insights
 
-**Note**: Make sure to set your `OPENAI_API_KEY` in `.env.local` for the chatbot to work.
+**Note**: OpenAI integration can be re-enabled later by updating `app/chat/page.tsx` and `app/api/chat/route.ts`.
 
 ## 🧪 Testing
 
-Currently, the application uses mock data for:
-- Property listings
-- News feed posts
-- Authentication (front-end only)
+The application now uses Supabase for:
+- ✅ User authentication (email/password)
+- ✅ User profiles
+- ✅ Feed posts (create, read, like)
+- ⚠️ Property listings (still using mock data - can be migrated to Supabase)
 
-In production, these should be replaced with real API calls to a backend service.
+## 📊 Database Schema
+
+The application uses Supabase with the following tables:
+- `profiles` - User profile information
+- `posts` - Feed posts
+- `likes` - Post likes
+- `follows` - User follows (ready for future use)
+
+All tables have Row Level Security (RLS) enabled for data protection.
 
 ## 📄 License
 
