@@ -186,11 +186,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   /**
+   * Clean up stale auth keys from localStorage
+   * Only removes keys starting with 'sb-' and 'supabase.auth.token'
+   */
+  const cleanupStaleAuthKeys = () => {
+    if (typeof window === 'undefined') return;
+    
+    try {
+      console.log('[AuthContext] Cleaning up stale auth keys from localStorage...');
+      const keysToRemove: string[] = [];
+      
+      // Find all keys starting with 'sb-' or containing 'supabase.auth.token'
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('sb-') || key.includes('supabase.auth.token'))) {
+          keysToRemove.push(key);
+        }
+      }
+      
+      // Remove the keys
+      keysToRemove.forEach(key => {
+        localStorage.removeItem(key);
+        console.log(`[AuthContext] Removed localStorage key: ${key}`);
+      });
+      
+      if (keysToRemove.length > 0) {
+        console.log(`[AuthContext] Cleaned up ${keysToRemove.length} stale auth keys`);
+      } else {
+        console.log('[AuthContext] No stale auth keys found');
+      }
+    } catch (error) {
+      console.error('[AuthContext] Error cleaning up localStorage:', error);
+    }
+  };
+
+  /**
    * Login with email and password using Supabase
    */
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
-      console.log('[AuthContext] login() called');
+      console.log('[AuthContext] signIn start');
       setIsLoading(true);
       
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -199,13 +234,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (error) {
-        console.error('[AuthContext] Login error:', error);
+        console.error('[AuthContext] signIn error:', {
+          message: error.message,
+          name: error.name,
+          status: (error as any).status,
+        });
+        
+        // Check if it's an auth-related error (invalid credentials, etc.)
+        const isAuthError = error.name === 'AuthApiError' || 
+                           error.message?.toLowerCase().includes('invalid') ||
+                           error.message?.toLowerCase().includes('credentials') ||
+                           error.message?.toLowerCase().includes('email') ||
+                           error.message?.toLowerCase().includes('password');
+        
+        if (isAuthError) {
+          console.log('[AuthContext] Auth error detected, cleaning up stale state...');
+          // Sign out to clear any stale session
+          await supabase.auth.signOut();
+          console.log('[AuthContext] signOut cleanup executed');
+          // Clean up localStorage keys
+          cleanupStaleAuthKeys();
+        }
+        
         setIsLoading(false);
         return false;
       }
 
       if (data.user) {
-        console.log('[AuthContext] Login successful, loading profile...');
+        console.log('[AuthContext] signIn success');
         const userData = await loadUserProfile(data.user);
         if (userData) {
           console.log('[AuthContext] Profile loaded, setting user state');
@@ -222,10 +278,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setIsLoading(false);
       return false;
-    } catch (error) {
-      console.error('[AuthContext] Login exception:', error);
+    } catch (error: any) {
+      console.error('[AuthContext] Login exception:', {
+        message: error?.message,
+        name: error?.name,
+      });
+      
+      // On any exception, try to clean up
+      try {
+        await supabase.auth.signOut();
+        cleanupStaleAuthKeys();
+      } catch (cleanupError) {
+        console.error('[AuthContext] Error during cleanup:', cleanupError);
+      }
+      
       setIsLoading(false);
       return false;
+    } finally {
+      // ALWAYS reset loading state, even if we return early
+      console.log('[AuthContext] isLoading reset');
+      setIsLoading(false);
     }
   };
 
