@@ -12,6 +12,7 @@ import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
 import Comments from "@/components/Comments";
+import { isValidUrl } from "@/lib/utils";
 
 interface PostCardProps {
   postId: number;
@@ -317,7 +318,7 @@ export default function PostCard({
       {/* Content */}
       <div className="p-4">
         <p className="text-gray-700 mb-4 whitespace-pre-wrap break-words">{content}</p>
-        {imageUrl && (
+        {imageUrl && isValidUrl(imageUrl) && (
           <div className="rounded-xl overflow-hidden mb-4">
             <img
               src={imageUrl}

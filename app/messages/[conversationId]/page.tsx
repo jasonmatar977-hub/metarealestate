@@ -13,6 +13,7 @@ import { supabase } from "@/lib/supabaseClient";
 import Navbar from "@/components/Navbar";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import Link from "next/link";
+import { isValidUrl } from "@/lib/utils";
 
 interface Message {
   id: string;
@@ -270,7 +271,7 @@ export default function ChatPage() {
             </Link>
             {otherUser && (
               <div className="flex items-center gap-3 flex-1">
-                {otherUser.avatar_url ? (
+                {otherUser.avatar_url && isValidUrl(otherUser.avatar_url) ? (
                   <img
                     src={otherUser.avatar_url}
                     alt={displayName}

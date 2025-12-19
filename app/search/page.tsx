@@ -13,6 +13,7 @@ import { supabase } from "@/lib/supabaseClient";
 import Navbar from "@/components/Navbar";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import Link from "next/link";
+import { isValidUrl } from "@/lib/utils";
 
 interface UserProfile {
   id: string;
@@ -61,7 +62,13 @@ export default function SearchPage() {
         .eq("follower_id", user.id);
 
       if (error) {
-        console.error("Error loading following status:", error);
+        console.error("Error loading following status:", {
+          error,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+        });
         return;
       }
 
@@ -70,8 +77,14 @@ export default function SearchPage() {
         following[follow.followed_id] = true;
       });
       setFollowingMap(following);
-    } catch (error) {
-      console.error("Error in loadFollowingStatus:", error);
+    } catch (error: any) {
+      console.error("Error in loadFollowingStatus:", {
+        error,
+        message: error?.message,
+        details: error?.details,
+        hint: error?.hint,
+        code: error?.code,
+      });
     }
   };
 
@@ -239,7 +252,7 @@ export default function SearchPage() {
                     >
                       {/* Avatar */}
                       <Link href={`/u/${profile.id}`} className="flex-shrink-0">
-                        {profile.avatar_url ? (
+                        {profile.avatar_url && isValidUrl(profile.avatar_url) ? (
                           <img
                             src={profile.avatar_url}
                             alt={displayName}

@@ -13,6 +13,7 @@ import { supabase } from "@/lib/supabaseClient";
 import Navbar from "@/components/Navbar";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import Link from "next/link";
+import { isValidUrl } from "@/lib/utils";
 
 interface Conversation {
   id: string;
@@ -252,7 +253,7 @@ export default function MessagesPage() {
                     className="glass-dark rounded-2xl p-4 flex items-center gap-4 hover:bg-gold/5 transition-colors"
                   >
                     {/* Avatar */}
-                    {conv.otherUser.avatar_url ? (
+                    {conv.otherUser.avatar_url && isValidUrl(conv.otherUser.avatar_url) ? (
                       <img
                         src={conv.otherUser.avatar_url}
                         alt={displayName}
