@@ -118,7 +118,16 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
           .getPublicUrl(filePath);
 
         imageUrl = urlData.publicUrl;
-        console.log("Image uploaded:", imageUrl);
+        console.log("=== IMAGE UPLOAD SUCCESS ===");
+        console.log("File path:", filePath);
+        console.log("Public URL:", imageUrl);
+        console.log("Full URL data:", urlData);
+        
+        // Validate URL format
+        if (!imageUrl || !imageUrl.startsWith('http')) {
+          console.error("⚠️ Invalid image URL generated:", imageUrl);
+          throw new Error("Failed to generate image URL. Please try again.");
+        }
       }
 
       // Insert post into Supabase

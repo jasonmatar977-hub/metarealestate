@@ -6,7 +6,7 @@
  * Instagram-like messages interface (placeholder for now)
  */
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -14,17 +14,20 @@ import Navbar from "@/components/Navbar";
 import MobileBottomNav from "@/components/MobileBottomNav";
 
 export default function MessagesPage() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, loadingSession } = useAuth();
   const { t } = useLanguage();
   const router = useRouter();
+  const [hasRedirected, setHasRedirected] = useState(false);
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    // Do not redirect until initial session check completes
+    if (!loadingSession && !isLoading && !isAuthenticated && !hasRedirected) {
+      setHasRedirected(true);
       router.push("/login");
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [isAuthenticated, isLoading, loadingSession, router, hasRedirected]);
 
-  if (isLoading) {
+  if (loadingSession || isLoading) {
     return (
       <main className="min-h-screen flex items-center justify-center">
         <div className="text-center">

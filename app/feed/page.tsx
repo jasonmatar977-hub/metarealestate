@@ -15,6 +15,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
 import Navbar from "@/components/Navbar";
 import PostCard from "@/components/PostCard";
+
+// DEBUG: Log import path
+console.log('[Feed] PostCard import path:', '@/components/PostCard');
 import CreatePost from "@/components/CreatePost";
 import MobileBottomNav from "@/components/MobileBottomNav";
 
@@ -39,6 +42,7 @@ export default function FeedPage() {
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasRedirected, setHasRedirected] = useState(false); // Prevent infinite redirect loops
+  const [deletingPostId, setDeletingPostId] = useState<number | null>(null); // Track which post is being deleted
 
   // Load posts from Supabase with fallback approach
   const loadPosts = async () => {
@@ -146,6 +150,14 @@ export default function FeedPage() {
         const profile = profilesMap.get(post.user_id);
         const postLikes = (likesData || []).filter((l) => l.post_id === post.id);
         const postComments = (commentsData || []).filter((c) => c.post_id === post.id);
+        
+        // Debug log image URLs
+        if (post.image_url) {
+          console.log(`Post ${post.id} image_url:`, post.image_url);
+          if (!post.image_url.startsWith('http')) {
+            console.warn(`⚠️ Post ${post.id} has invalid image_url format:`, post.image_url);
+          }
+        }
         
         return {
           ...post,
@@ -299,21 +311,43 @@ export default function FeedPage() {
             </div>
           ) : (
             <div className="space-y-6">
-              {posts.map((post) => (
-                <PostCard
-                  key={post.id}
-                  postId={post.id}
-                  username={post.profile?.display_name || "User"}
-                  avatar={getInitials(post.profile?.display_name, post.user_id)}
-                  timestamp={formatTimestamp(post.created_at)}
-                  content={post.content}
-                  imageUrl={post.image_url || undefined}
-                  likes={post.likes_count || 0}
-                  userLiked={post.user_liked || false}
-                  comments={post.comments_count || 0}
-                  onLikeToggle={loadPosts}
-                />
-              ))}
+              {posts.map((post) => {
+                // DEBUG: Log post data before rendering PostCard
+                console.log(`[Feed] Rendering PostCard for post ${post.id}:`, {
+                  postId: post.id,
+                  userId: post.user_id,
+                  userIdType: typeof post.user_id,
+                  userIdExists: !!post.user_id,
+                  currentUser: user?.id,
+                  currentUserType: typeof user?.id,
+                  willBeOwner: user?.id === post.user_id
+                });
+                
+                return (
+                  <PostCard
+                    key={post.id}
+                    postId={post.id}
+                    userId={post.user_id}
+                    username={post.profile?.display_name || "User"}
+                    avatar={getInitials(post.profile?.display_name, post.user_id)}
+                    timestamp={formatTimestamp(post.created_at)}
+                    content={post.content}
+                    imageUrl={post.image_url || undefined}
+                    likes={post.likes_count || 0}
+                    userLiked={post.user_liked || false}
+                    comments={post.comments_count || 0}
+                    onLikeToggle={loadPosts}
+                    onPostDeleted={() => {
+                      // Optimistic UI: Remove post immediately from state
+                      setPosts((prevPosts) => prevPosts.filter((p) => p.id !== post.id));
+                      // Then refresh to get accurate counts
+                      setTimeout(() => {
+                        loadPosts();
+                      }, 100);
+                    }}
+                  />
+                );
+              })}
             </div>
           )}
         </div>

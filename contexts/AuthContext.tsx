@@ -23,6 +23,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   user: User | null;
   isLoading: boolean;
+  loadingSession: boolean; // True while checking initial session
   login: (email: string, password: string) => Promise<boolean>;
   register: (userData: RegisterData) => Promise<boolean>;
   logout: () => Promise<void>;
@@ -44,6 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadingSession, setLoadingSession] = useState(true); // Track initial session check
 
   // Load user profile from Supabase
   const loadUserProfile = async (supabaseUser: SupabaseUser): Promise<User | null> => {
@@ -76,26 +78,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (typeof window === "undefined") {
       setIsLoading(false);
+      setLoadingSession(false);
       return;
     }
 
-    // Get initial session
+    let isMounted = true; // Prevent state updates if component unmounts
+
+    // Get initial session - do not redirect until this completes
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!isMounted) return;
+
       if (session?.user) {
         loadUserProfile(session.user).then((userData) => {
+          if (!isMounted) return;
           if (userData) {
             setIsAuthenticated(true);
             setUser(userData);
           }
         });
+      } else {
+        setIsAuthenticated(false);
+        setUser(null);
       }
+      
+      // Mark initial session check as complete
+      setLoadingSession(false);
       setIsLoading(false);
+    }).catch((error) => {
+      console.error("Error getting session:", error);
+      if (isMounted) {
+        setLoadingSession(false);
+        setIsLoading(false);
+        setIsAuthenticated(false);
+        setUser(null);
+      }
     });
 
-    // Listen for auth changes
+    // Listen for auth changes (after initial session check)
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!isMounted) return;
+
       if (session?.user) {
         const userData = await loadUserProfile(session.user);
         if (userData) {
@@ -110,6 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     return () => {
+      isMounted = false;
       subscription.unsubscribe();
     };
   }, []);
@@ -218,7 +243,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, user, isLoading, login, register, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, user, isLoading, loadingSession, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   );

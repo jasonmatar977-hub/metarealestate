@@ -112,9 +112,10 @@ type SortOption = 'newest' | 'price-low' | 'price-high';
 type PropertyType = 'all' | Property['type'];
 
 export default function ListingsPage() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, loadingSession } = useAuth();
   const { t } = useLanguage();
   const router = useRouter();
+  const [hasRedirected, setHasRedirected] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 5000000]);
@@ -123,10 +124,12 @@ export default function ListingsPage() {
   const [sortBy, setSortBy] = useState<SortOption>('newest');
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    // Do not redirect until initial session check completes
+    if (!loadingSession && !isLoading && !isAuthenticated && !hasRedirected) {
+      setHasRedirected(true);
       router.push("/login");
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [isAuthenticated, isLoading, loadingSession, router, hasRedirected]);
 
   // Filter and sort properties
   const filteredProperties = useMemo(() => {
