@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
+import { findOrCreateConversation } from "@/lib/messages";
 import Navbar from "@/components/Navbar";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import Link from "next/link";
@@ -40,6 +41,7 @@ export default function PublicProfilePage() {
   const [followingCount, setFollowingCount] = useState(0);
   const [isFollowing, setIsFollowing] = useState(false);
   const [isTogglingFollow, setIsTogglingFollow] = useState(false);
+  const [isStartingChat, setIsStartingChat] = useState(false);
 
   useEffect(() => {
     if (userId) {
@@ -221,6 +223,38 @@ export default function PublicProfilePage() {
     }
   };
 
+  const handleStartChat = async () => {
+    if (!user || !isAuthenticated) {
+      router.push("/login");
+      return;
+    }
+
+    if (isStartingChat) return;
+
+    try {
+      setIsStartingChat(true);
+      const { conversationId, error } = await findOrCreateConversation(user.id, userId);
+
+      if (error) {
+        console.error("Error finding/creating conversation:", {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+        });
+        alert("Failed to start conversation. Please try again.");
+        return;
+      }
+
+      router.push(`/messages/${conversationId}`);
+    } catch (error: any) {
+      console.error("Error in handleStartChat:", error);
+      alert("Failed to start conversation. Please try again.");
+    } finally {
+      setIsStartingChat(false);
+    }
+  };
+
   const formatTimestamp = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -359,7 +393,7 @@ export default function PublicProfilePage() {
                 </div>
               </div>
 
-              {/* Follow/Edit Button */}
+              {/* Follow/Edit/Message Buttons */}
               {isOwnProfile ? (
                 <Link
                   href="/profile/edit"
@@ -368,17 +402,28 @@ export default function PublicProfilePage() {
                   Edit Profile
                 </Link>
               ) : isAuthenticated ? (
-                <button
-                  onClick={handleFollowToggle}
-                  disabled={isTogglingFollow}
-                  className={`px-6 py-2 font-bold rounded-xl transition-all ${
-                    isFollowing
-                      ? "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                      : "bg-gradient-to-r from-gold to-gold-light text-gray-900 hover:shadow-lg"
-                  } ${isTogglingFollow ? "opacity-50 cursor-not-allowed" : ""}`}
-                >
-                  {isTogglingFollow ? "..." : isFollowing ? "Following" : "Follow"}
-                </button>
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleFollowToggle}
+                    disabled={isTogglingFollow}
+                    className={`px-6 py-2 font-bold rounded-xl transition-all ${
+                      isFollowing
+                        ? "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                        : "bg-gradient-to-r from-gold to-gold-light text-gray-900 hover:shadow-lg"
+                    } ${isTogglingFollow ? "opacity-50 cursor-not-allowed" : ""}`}
+                  >
+                    {isTogglingFollow ? "..." : isFollowing ? "Following" : "Follow"}
+                  </button>
+                  <button
+                    onClick={handleStartChat}
+                    disabled={isStartingChat}
+                    className={`px-6 py-2 font-bold rounded-xl transition-all bg-white border-2 border-gold text-gold hover:bg-gold hover:text-gray-900 ${
+                      isStartingChat ? "opacity-50 cursor-not-allowed" : ""
+                    }`}
+                  >
+                    {isStartingChat ? "..." : "Message"}
+                  </button>
+                </div>
               ) : (
                 <Link
                   href="/login"
