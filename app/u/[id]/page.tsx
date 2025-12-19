@@ -15,6 +15,7 @@ import Navbar from "@/components/Navbar";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import Link from "next/link";
 import PostCard from "@/components/PostCard";
+import { isValidUrl } from "@/lib/utils";
 
 interface Profile {
   id: string;
@@ -155,7 +156,7 @@ export default function PublicProfilePage() {
   };
 
   const checkFollowingStatus = async () => {
-    if (!user || !isAuthenticated) return;
+    if (!user || !isAuthenticated || !userId) return;
 
     try {
       const { data, error } = await supabase
@@ -166,13 +167,25 @@ export default function PublicProfilePage() {
         .single();
 
       if (error && error.code !== "PGRST116") {
-        console.error("Error checking follow status:", error);
+        console.error("Error checking follow status:", {
+          error,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+        });
         return;
       }
 
       setIsFollowing(!!data);
-    } catch (error) {
-      console.error("Error in checkFollowingStatus:", error);
+    } catch (error: any) {
+      console.error("Error in checkFollowingStatus:", {
+        error,
+        message: error?.message,
+        details: error?.details,
+        hint: error?.hint,
+        code: error?.code,
+      });
     }
   };
 
@@ -337,7 +350,7 @@ export default function PublicProfilePage() {
             <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
               {/* Avatar */}
               <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full bg-gradient-to-r from-gold to-gold-light flex items-center justify-center text-gray-900 font-bold text-3xl sm:text-4xl flex-shrink-0">
-                {profile.avatar_url ? (
+                {profile.avatar_url && isValidUrl(profile.avatar_url) ? (
                   <img
                     src={profile.avatar_url}
                     alt={displayName}
