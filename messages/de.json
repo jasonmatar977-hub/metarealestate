@@ -1,0 +1,68 @@
+{
+  "common": {
+    "login": "Anmelden",
+    "logout": "Abmelden",
+    "createAccount": "Konto erstellen",
+    "profile": "Profil",
+    "editProfile": "Profil bearbeiten",
+    "cancel": "Abbrechen",
+    "save": "Speichern",
+    "loading": "Lädt...",
+    "error": "Fehler",
+    "success": "Erfolg"
+  },
+  "navbar": {
+    "about": "Über uns",
+    "whatWeDo": "Was wir tun",
+    "testimonials": "Testimonials",
+    "contact": "Kontakt",
+    "listings": "Immobilien",
+    "feed": "Feed",
+    "chat": "Chat"
+  },
+  "home": {
+    "title": "META REAL ESTATE",
+    "subtitle": "Die Zukunft der Immobilienentdeckung",
+    "description": "Entdecken Sie Immobilien, gewinnen Sie Einblicke und verbinden Sie sich mit Möglichkeiten durch modernste KI-Technologie"
+  },
+  "listings": {
+    "title": "Immobilienliste",
+    "subtitle": "Entdecken Sie Ihre perfekte Immobilie aus unserer kuratierten Auswahl"
+  },
+  "feed": {
+    "title": "News Feed",
+    "subtitle": "Bleiben Sie auf dem Laufenden mit den neuesten Nachrichten aus unserer Community",
+    "noPosts": "Noch keine Beiträge. Seien Sie der Erste, der postet!",
+    "whatsOnMind": "Woran denkst du?",
+    "post": "Posten",
+    "posting": "Wird gepostet...",
+    "like": "Gefällt mir",
+    "comment": "Kommentar",
+    "share": "Teilen"
+  },
+  "profile": {
+    "title": "Profil",
+    "editTitle": "Profil bearbeiten",
+    "memberSince": "Mitglied seit",
+    "accountInfo": "Kontoinformationen",
+    "displayName": "Anzeigename",
+    "bio": "Biografie",
+    "avatarUrl": "Avatar-URL",
+    "location": "Standort",
+    "phone": "Telefon",
+    "website": "Website",
+    "saveChanges": "Änderungen speichern",
+    "saving": "Wird gespeichert...",
+    "profileUpdated": "Profil erfolgreich aktualisiert!"
+  },
+  "chat": {
+    "title": "KI-Chatbot",
+    "subtitle": "Fragen Sie mich alles über Immobilien",
+    "placeholder": "Geben Sie Ihre Nachricht ein...",
+    "send": "Senden"
+  }
+}
+
+
+
+

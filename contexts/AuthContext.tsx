@@ -186,14 +186,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   /**
    * Logout from Supabase
+   * Reliably signs out and clears session
    */
   const logout = async (): Promise<void> => {
     try {
-      await supabase.auth.signOut();
+      // Clear state first
       setIsAuthenticated(false);
       setUser(null);
+      
+      // Sign out from Supabase
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error('Logout error:', error);
+        // Still clear state even if signOut fails
+        setIsAuthenticated(false);
+        setUser(null);
+      }
+      
+      // Clear any cached session data
+      if (typeof window !== 'undefined') {
+        // Clear localStorage if needed
+        // Note: Supabase handles session storage automatically
+      }
     } catch (error) {
       console.error('Logout error:', error);
+      // Ensure state is cleared even on error
+      setIsAuthenticated(false);
+      setUser(null);
     }
   };
 

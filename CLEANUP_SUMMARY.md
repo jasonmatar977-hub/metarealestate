@@ -90,3 +90,10 @@ npm run dev
 
 **Repository is now clean and contains only the Next.js Meta Real Estate application.**
 
+
+
+
+
+
+
+

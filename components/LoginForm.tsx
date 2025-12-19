@@ -14,6 +14,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { validateEmail, validatePassword, getEmailError, getPasswordError } from "@/lib/validation";
 
@@ -120,6 +121,15 @@ export default function LoginForm() {
                 autoComplete="current-password"
               />
               {errors.password && <p className="text-red-500 text-sm mt-1">{errors.password}</p>}
+            </div>
+
+            <div className="text-right">
+              <Link
+                href="/reset-password"
+                className="text-sm text-gold hover:text-gold-dark font-semibold"
+              >
+                Forgot password?
+              </Link>
             </div>
 
             {errors.submit && (

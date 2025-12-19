@@ -121,3 +121,10 @@ This will create:
 - If missing, check trigger exists in database
 - Manually create profile if needed: `INSERT INTO profiles (id, display_name) VALUES (user_id, 'Name');`
 
+
+
+
+
+
+
+

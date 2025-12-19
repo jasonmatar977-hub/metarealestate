@@ -9,19 +9,16 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
+import { useLanguage } from "@/contexts/LanguageContext";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
+import ProfileDropdown from "@/components/ProfileDropdown";
 
 export default function Navbar() {
-  const { isAuthenticated, logout, user } = useAuth();
+  const { isAuthenticated, logout } = useAuth();
+  const { t } = useLanguage();
   const pathname = usePathname();
-  const router = useRouter();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
-  const handleLogout = () => {
-    logout();
-    router.push('/');
-    setIsMobileMenuOpen(false);
-  };
 
   const closeMobileMenu = () => {
     setIsMobileMenuOpen(false);
@@ -45,16 +42,16 @@ export default function Navbar() {
             {pathname === '/' && (
               <div className="flex items-center space-x-8 mr-4">
                 <a href="#about" className="text-gray-700 hover:text-gold transition-colors font-semibold">
-                  About
+                  {t('navbar.about')}
                 </a>
                 <a href="#what-we-do" className="text-gray-700 hover:text-gold transition-colors font-semibold">
-                  What We Do
+                  {t('navbar.whatWeDo')}
                 </a>
                 <a href="#testimonials" className="text-gray-700 hover:text-gold transition-colors font-semibold">
-                  Testimonials
+                  {t('navbar.testimonials')}
                 </a>
                 <a href="#contact" className="text-gray-700 hover:text-gold transition-colors font-semibold">
-                  Contact
+                  {t('navbar.contact')}
                 </a>
               </div>
             )}
@@ -66,26 +63,23 @@ export default function Navbar() {
                   href="/listings"
                   className="px-4 py-2 text-gray-700 hover:text-gold transition-colors font-semibold"
                 >
-                  Listings
+                  {t('navbar.listings')}
                 </Link>
                 <Link
                   href="/feed"
                   className="px-4 py-2 text-gray-700 hover:text-gold transition-colors font-semibold"
                 >
-                  Feed
+                  {t('navbar.feed')}
                 </Link>
                 <Link
                   href="/chat"
                   className="px-4 py-2 text-gray-700 hover:text-gold transition-colors font-semibold"
                 >
-                  Chat
+                  {t('navbar.chat')}
                 </Link>
-                <button
-                  onClick={handleLogout}
-                  className="px-6 py-2 bg-gradient-to-r from-gold to-gold-light text-gray-900 font-bold rounded-xl hover:shadow-lg hover:scale-105 transition-all"
-                >
-                  Logout
-                </button>
+                <LanguageSwitcher />
+                {/* Profile Dropdown - Only avatar icon visible */}
+                <ProfileDropdown />
               </>
             ) : (
               <>
@@ -93,14 +87,15 @@ export default function Navbar() {
                   href="/login"
                   className="px-6 py-2 bg-white border-2 border-gold text-gold font-bold rounded-xl hover:bg-gold hover:text-gray-900 transition-all"
                 >
-                  Login
+                  {t('common.login')}
                 </Link>
                 <Link
                   href="/register"
                   className="px-6 py-2 bg-gradient-to-r from-gold to-gold-light text-gray-900 font-bold rounded-xl hover:shadow-lg hover:scale-105 transition-all"
                 >
-                  Create Account
+                  {t('common.createAccount')}
                 </Link>
+                <LanguageSwitcher />
               </>
             )}
           </div>
@@ -141,28 +136,28 @@ export default function Navbar() {
                     onClick={closeMobileMenu}
                     className="px-4 py-2 text-gray-700 hover:text-gold hover:bg-gold/10 transition-colors font-semibold rounded-lg"
                   >
-                    About
+                    {t('navbar.about')}
                   </a>
                   <a
                     href="#what-we-do"
                     onClick={closeMobileMenu}
                     className="px-4 py-2 text-gray-700 hover:text-gold hover:bg-gold/10 transition-colors font-semibold rounded-lg"
                   >
-                    What We Do
+                    {t('navbar.whatWeDo')}
                   </a>
                   <a
                     href="#testimonials"
                     onClick={closeMobileMenu}
                     className="px-4 py-2 text-gray-700 hover:text-gold hover:bg-gold/10 transition-colors font-semibold rounded-lg"
                   >
-                    Testimonials
+                    {t('navbar.testimonials')}
                   </a>
                   <a
                     href="#contact"
                     onClick={closeMobileMenu}
                     className="px-4 py-2 text-gray-700 hover:text-gold hover:bg-gold/10 transition-colors font-semibold rounded-lg"
                   >
-                    Contact
+                    {t('navbar.contact')}
                   </a>
                 </>
               )}
@@ -175,27 +170,48 @@ export default function Navbar() {
                     onClick={closeMobileMenu}
                     className="px-4 py-2 text-gray-700 hover:text-gold hover:bg-gold/10 transition-colors font-semibold rounded-lg"
                   >
-                    Listings
+                    {t('navbar.listings')}
                   </Link>
                   <Link
                     href="/feed"
                     onClick={closeMobileMenu}
                     className="px-4 py-2 text-gray-700 hover:text-gold hover:bg-gold/10 transition-colors font-semibold rounded-lg"
                   >
-                    Feed
+                    {t('navbar.feed')}
                   </Link>
                   <Link
                     href="/chat"
                     onClick={closeMobileMenu}
                     className="px-4 py-2 text-gray-700 hover:text-gold hover:bg-gold/10 transition-colors font-semibold rounded-lg"
                   >
-                    Chat
+                    {t('navbar.chat')}
                   </Link>
-                  <button
-                    onClick={handleLogout}
-                    className="px-4 py-2 bg-gradient-to-r from-gold to-gold-light text-gray-900 font-bold rounded-xl text-left"
+                  <Link
+                    href="/profile"
+                    onClick={closeMobileMenu}
+                    className="px-4 py-2 text-gray-700 hover:text-gold hover:bg-gold/10 transition-colors font-semibold rounded-lg"
                   >
-                    Logout
+                    {t('common.profile')}
+                  </Link>
+                  <Link
+                    href="/profile/edit"
+                    onClick={closeMobileMenu}
+                    className="px-4 py-2 text-gray-700 hover:text-gold hover:bg-gold/10 transition-colors font-semibold rounded-lg"
+                  >
+                    {t('common.editProfile')}
+                  </Link>
+                  <div className="px-4 py-2">
+                    <LanguageSwitcher />
+                  </div>
+                  <button
+                    onClick={async () => {
+                      await logout();
+                      closeMobileMenu();
+                      window.location.href = '/login';
+                    }}
+                    className="px-4 py-2 text-red-600 hover:bg-red-50 transition-colors font-semibold rounded-lg text-left"
+                  >
+                    {t('common.logout')}
                   </button>
                 </>
               ) : (
@@ -205,15 +221,18 @@ export default function Navbar() {
                     onClick={closeMobileMenu}
                     className="px-4 py-2 bg-white border-2 border-gold text-gold font-bold rounded-xl hover:bg-gold hover:text-gray-900 transition-all text-center"
                   >
-                    Login
+                    {t('common.login')}
                   </Link>
                   <Link
                     href="/register"
                     onClick={closeMobileMenu}
                     className="px-4 py-2 bg-gradient-to-r from-gold to-gold-light text-gray-900 font-bold rounded-xl text-center"
                   >
-                    Create Account
+                    {t('common.createAccount')}
                   </Link>
+                  <div className="px-4 py-2">
+                    <LanguageSwitcher />
+                  </div>
                 </>
               )}
             </div>

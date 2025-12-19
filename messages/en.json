@@ -1,0 +1,68 @@
+{
+  "common": {
+    "login": "Login",
+    "logout": "Logout",
+    "createAccount": "Create Account",
+    "profile": "Profile",
+    "editProfile": "Edit Profile",
+    "cancel": "Cancel",
+    "save": "Save",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success"
+  },
+  "navbar": {
+    "about": "About",
+    "whatWeDo": "What We Do",
+    "testimonials": "Testimonials",
+    "contact": "Contact",
+    "listings": "Listings",
+    "feed": "Feed",
+    "chat": "Chat"
+  },
+  "home": {
+    "title": "META REAL ESTATE",
+    "subtitle": "The Future of Property Discovery",
+    "description": "Discover properties, gain insights, and connect with opportunities through cutting-edge AI technology"
+  },
+  "listings": {
+    "title": "Property Listings",
+    "subtitle": "Discover your perfect property from our curated selection"
+  },
+  "feed": {
+    "title": "News Feed",
+    "subtitle": "Stay updated with the latest from our community",
+    "noPosts": "No posts yet. Be the first to post!",
+    "whatsOnMind": "What's on your mind?",
+    "post": "Post",
+    "posting": "Posting...",
+    "like": "Like",
+    "comment": "Comment",
+    "share": "Share"
+  },
+  "profile": {
+    "title": "Profile",
+    "editTitle": "Edit Profile",
+    "memberSince": "Member since",
+    "accountInfo": "Account Information",
+    "displayName": "Display Name",
+    "bio": "Bio",
+    "avatarUrl": "Avatar URL",
+    "location": "Location",
+    "phone": "Phone",
+    "website": "Website",
+    "saveChanges": "Save Changes",
+    "saving": "Saving...",
+    "profileUpdated": "Profile updated successfully!"
+  },
+  "chat": {
+    "title": "AI Chatbot",
+    "subtitle": "Ask me anything about real estate",
+    "placeholder": "Type your message...",
+    "send": "Send"
+  }
+}
+
+
+
+
