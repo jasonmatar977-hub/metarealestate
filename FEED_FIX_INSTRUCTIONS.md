@@ -178,3 +178,7 @@ After confirming the feed works:
 3. Verify author names display correctly
 4. Check mobile responsiveness
 
+
+
+
+

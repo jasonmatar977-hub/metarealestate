@@ -16,17 +16,20 @@ import { supabase } from "@/lib/supabaseClient";
 import Navbar from "@/components/Navbar";
 import PostCard from "@/components/PostCard";
 import CreatePost from "@/components/CreatePost";
+import MobileBottomNav from "@/components/MobileBottomNav";
 
 interface Post {
   id: number;
   user_id: string;
   content: string;
   created_at: string;
+  image_url?: string | null;
   profile?: {
     display_name: string | null;
   };
   likes_count?: number;
   user_liked?: boolean;
+  comments_count?: number;
 }
 
 export default function FeedPage() {
@@ -51,7 +54,7 @@ export default function FeedPage() {
       // Step 1: Fetch posts (simple query, no join)
       const { data: postsData, error: postsError } = await supabase
         .from('posts')
-        .select('id, user_id, content, created_at')
+        .select('id, user_id, content, created_at, image_url')
         .order('created_at', { ascending: false })
         .limit(50);
 
@@ -112,7 +115,19 @@ export default function FeedPage() {
         // Continue without likes if error
       }
 
-      // Step 5: Merge data
+      // Step 5: Get comment counts
+      const { data: commentsData, error: commentsError } = await supabase
+        .from('comments')
+        .select('post_id')
+        .in('post_id', postIds);
+
+      if (commentsError) {
+        console.error("=== COMMENTS ERROR ===");
+        console.error("Full error:", commentsError);
+        // Continue without comment counts if error
+      }
+
+      // Step 6: Merge data
       const profilesMap = new Map(
         (profilesData || []).map((p) => [p.id, p])
       );
@@ -120,12 +135,14 @@ export default function FeedPage() {
       const postsWithData = postsData.map((post) => {
         const profile = profilesMap.get(post.user_id);
         const postLikes = (likesData || []).filter((l) => l.post_id === post.id);
+        const postComments = (commentsData || []).filter((c) => c.post_id === post.id);
         
         return {
           ...post,
           profile: profile ? { display_name: profile.display_name } : undefined,
           likes_count: postLikes.length,
           user_liked: postLikes.some((l) => l.user_id === user.id),
+          comments_count: postComments.length,
         };
       });
 
@@ -186,7 +203,7 @@ export default function FeedPage() {
     );
   }
 
-  // Format timestamp
+  // Format timestamp (Instagram-style)
   const formatTimestamp = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -196,10 +213,17 @@ export default function FeedPage() {
     const diffDays = Math.floor(diffMs / 86400000);
 
     if (diffMins < 1) return "Just now";
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
+    if (diffMins < 60) return `${diffMins}m`;
+    if (diffHours < 24) return `${diffHours}h`;
+    if (diffDays === 1) return "Yesterday";
+    if (diffDays < 7) return `${diffDays}d`;
+    
+    // Format as "Dec 18, 2025" style
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
+    });
   };
 
   // Get user initials
@@ -270,8 +294,10 @@ export default function FeedPage() {
                   avatar={getInitials(post.profile?.display_name, post.user_id)}
                   timestamp={formatTimestamp(post.created_at)}
                   content={post.content}
+                  imageUrl={post.image_url || undefined}
                   likes={post.likes_count || 0}
                   userLiked={post.user_liked || false}
+                  comments={post.comments_count || 0}
                   onLikeToggle={loadPosts}
                 />
               ))}
@@ -279,6 +305,7 @@ export default function FeedPage() {
           )}
         </div>
       </div>
+      <MobileBottomNav />
     </main>
   );
 }

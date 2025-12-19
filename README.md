@@ -5,10 +5,14 @@ A modern, AI-powered real estate platform built with Next.js 15, React, and Tail
 ## 🚀 Features
 
 - **Modern Landing Page**: Futuristic 2050-style design with glassmorphism effects
-- **Authentication System**: Login and registration flows with comprehensive validation
-- **Property Listings**: Responsive grid of property cards
-- **News Feed**: Instagram/Facebook-style vertical feed
-- **AI Chatbot**: Full integration with OpenAI ChatGPT API
+- **Authentication System**: Login and registration flows with comprehensive validation (Supabase Auth)
+- **Property Listings**: Enhanced listings with search, filters, and sorting
+- **News Feed**: Instagram/Facebook-style vertical feed with posts, likes, and comments
+- **User Profiles**: Instagram-like profile pages with edit functionality
+- **AI Chatbot**: Full integration with OpenAI ChatGPT API (currently disabled for deployment)
+- **Multi-Language Support**: i18n with English, Arabic (RTL), Chinese, and German
+- **Comments System**: Full comment and comment-like functionality on feed posts
+- **Professional Footer**: Modern footer with brand, links, contact, and social icons
 - **Responsive Design**: Mobile-first, fully responsive across all devices
 - **Security Hardened**: Front-end validation, security patterns, and best practices
 
@@ -37,22 +41,33 @@ myproject/
 │   ├── page.tsx           # Landing page
 │   └── globals.css        # Global styles
 ├── components/            # React components
-│   ├── Navbar.tsx         # Navigation bar
+│   ├── Navbar.tsx         # Navigation bar with language switcher
 │   ├── HeroSection.tsx    # Landing hero
 │   ├── AboutSection.tsx   # About section
 │   ├── WhatWeDoSection.tsx # Services section
 │   ├── TestimonialsSection.tsx # Testimonials
-│   ├── ContactSection.tsx # Contact form
+│   ├── ContactSection.tsx # Contact form (Formspree)
 │   ├── LoginForm.tsx      # Login form
 │   ├── RegisterForm.tsx   # Registration form
-│   ├── PropertyCard.tsx   # Property card component
-│   ├── PostCard.tsx       # Feed post component
+│   ├── PropertyCard.tsx   # Enhanced property card component
+│   ├── PostCard.tsx       # Feed post component with comments
+│   ├── Comments.tsx       # Comments component for posts
+│   ├── CreatePost.tsx     # Create post component
 │   ├── ChatMessage.tsx    # Chat message component
-│   └── ChatInput.tsx      # Chat input component
+│   ├── ChatInput.tsx      # Chat input component
+│   ├── LanguageSwitcher.tsx # Language dropdown
+│   └── Footer.tsx         # Professional footer
 ├── contexts/              # React contexts
-│   └── AuthContext.tsx    # Authentication context
+│   ├── AuthContext.tsx    # Authentication context (Supabase)
+│   └── LanguageContext.tsx # i18n language context
 ├── lib/                   # Utility functions
-│   └── validation.ts      # Form validation helpers
+│   ├── validation.ts      # Form validation helpers
+│   └── supabaseClient.ts  # Supabase client
+├── supabase/              # Database SQL files
+│   ├── schema.sql         # Main database schema
+│   ├── rls_policies.sql   # RLS policies
+│   ├── profile_upgrade.sql # Profile enhancements
+│   └── comments.sql       # Comments tables
 ├── package.json           # Dependencies
 ├── tsconfig.json          # TypeScript config
 ├── tailwind.config.ts     # Tailwind CSS config
@@ -86,8 +101,11 @@ myproject/
 3. **Set up database:**
    - Open your Supabase project dashboard
    - Go to SQL Editor
-   - Copy and paste the contents of `supabase/schema.sql`
-   - Run the SQL to create tables and policies
+   - Run SQL files in this order:
+     1. `supabase/schema.sql` - Creates main tables (profiles, posts, likes, follows)
+     2. `supabase/rls_policies.sql` - Sets up Row Level Security policies
+     3. `supabase/profile_upgrade.sql` - Adds profile fields (bio, avatar_url, location, etc.)
+     4. `supabase/comments.sql` - Creates comments and comment_likes tables
 
 4. **Run the development server:**
    ```bash
@@ -123,9 +141,11 @@ npm run lint
 - `/` - Landing page with hero, about, services, testimonials, and contact sections
 - `/login` - Login page (redirects to `/listings` on success)
 - `/register` - Registration page (redirects to `/listings` on success)
-- `/listings` - Property listings page (protected, requires authentication)
-- `/feed` - News feed page (protected, requires authentication)
-- `/chat` - AI chatbot page (protected, requires authentication)
+- `/listings` - Enhanced property listings with search, filters, and sorting (protected)
+- `/feed` - News feed with posts, likes, and comments (protected)
+- `/profile` - User profile page (protected)
+- `/profile/edit` - Edit profile page (protected)
+- `/chat` - AI chatbot page (protected, currently disabled)
 
 ## 🔐 Security Features
 
@@ -162,6 +182,16 @@ The following must be implemented on the backend:
 - Tablet: 640px - 1024px (2 column layouts)
 - Desktop: > 1024px (3-4 column layouts)
 
+## 🌍 Internationalization (i18n)
+
+The application supports multiple languages:
+- **English** (default) - LTR
+- **Arabic** (العربية) - RTL support
+- **Chinese** (中文) - LTR
+- **German** (Deutsch) - LTR
+
+Language preference is stored in localStorage and persists across sessions. The language switcher is available in the navbar.
+
 ## 🤖 AI Chatbot
 
 The chatbot currently uses mock responses (OpenAI integration disabled for deployment).
@@ -176,19 +206,29 @@ The chatbot currently uses mock responses (OpenAI integration disabled for deplo
 
 The application now uses Supabase for:
 - ✅ User authentication (email/password)
-- ✅ User profiles
+- ✅ User profiles with edit functionality
 - ✅ Feed posts (create, read, like)
+- ✅ Comments on posts (create, read, like)
+- ✅ Multi-language support with RTL for Arabic
 - ⚠️ Property listings (still using mock data - can be migrated to Supabase)
 
 ## 📊 Database Schema
 
 The application uses Supabase with the following tables:
-- `profiles` - User profile information
-- `posts` - Feed posts
-- `likes` - Post likes
+- `profiles` - User profile information (display_name, bio, avatar_url, location, phone, website)
+- `posts` - Feed posts (content, user_id, created_at)
+- `likes` - Post likes (post_id, user_id)
+- `comments` - Post comments (post_id, user_id, content, created_at)
+- `comment_likes` - Comment likes (comment_id, user_id)
 - `follows` - User follows (ready for future use)
 
 All tables have Row Level Security (RLS) enabled for data protection.
+
+### SQL Files to Run (in order):
+1. `supabase/schema.sql` - Main schema
+2. `supabase/rls_policies.sql` - RLS policies
+3. `supabase/profile_upgrade.sql` - Profile enhancements
+4. `supabase/comments.sql` - Comments system
 
 ## 📄 License
 

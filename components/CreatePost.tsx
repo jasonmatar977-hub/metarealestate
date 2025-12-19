@@ -18,6 +18,8 @@ interface CreatePostProps {
 export default function CreatePost({ onPostCreated }: CreatePostProps) {
   const { user } = useAuth();
   const [content, setContent] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,6 +33,35 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
       .join("")
       .toUpperCase()
       .slice(0, 2);
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        setError('Please select an image file');
+        return;
+      }
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        setError('Image must be less than 5MB');
+        return;
+      }
+      setImageFile(file);
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+      setError(null);
+    }
+  };
+
+  const removeImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -61,12 +92,42 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
       const userId = session.user.id;
       console.log("Using user_id from session:", userId);
 
+      let imageUrl: string | null = null;
+
+      // Upload image if present
+      if (imageFile) {
+        const fileExt = imageFile.name.split('.').pop();
+        const fileName = `${userId}-${Date.now()}.${fileExt}`;
+        const filePath = `${fileName}`;
+
+        const { error: uploadError, data: uploadData } = await supabase.storage
+          .from('post-media')
+          .upload(filePath, imageFile, {
+            cacheControl: '3600',
+            upsert: false
+          });
+
+        if (uploadError) {
+          console.error("Image upload error:", uploadError);
+          throw new Error("Failed to upload image. Please try again.");
+        }
+
+        // Get public URL
+        const { data: urlData } = supabase.storage
+          .from('post-media')
+          .getPublicUrl(filePath);
+
+        imageUrl = urlData.publicUrl;
+        console.log("Image uploaded:", imageUrl);
+      }
+
       // Insert post into Supabase
       const { data, error: insertError } = await supabase
         .from('posts')
         .insert({
           user_id: userId,
           content: content.trim(),
+          image_url: imageUrl,
         })
         .select()
         .single();
@@ -85,6 +146,8 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
 
       // Reset form
       setContent("");
+      setImageFile(null);
+      setImagePreview(null);
       
       // Refresh feed
       onPostCreated();
@@ -127,6 +190,39 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
             className="w-full px-4 py-3 rounded-xl border-2 border-gold/40 focus:border-gold focus:outline-none resize-none mb-3"
             maxLength={500}
           />
+
+          {/* Image Preview */}
+          {imagePreview && (
+            <div className="relative mb-3 rounded-xl overflow-hidden">
+              <img
+                src={imagePreview}
+                alt="Preview"
+                className="w-full h-auto max-h-64 object-cover"
+              />
+              <button
+                type="button"
+                onClick={removeImage}
+                className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-red-600 transition-colors"
+                aria-label="Remove image"
+              >
+                ×
+              </button>
+            </div>
+          )}
+
+          {/* Image Upload Button */}
+          <div className="mb-3">
+            <label className="inline-block px-4 py-2 bg-white border-2 border-gold text-gold font-semibold rounded-xl hover:bg-gold/10 transition-colors cursor-pointer">
+              <span className="mr-2">📷</span>
+              {imageFile ? 'Change Image' : 'Add Image'}
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+                className="hidden"
+              />
+            </label>
+          </div>
 
           {error && (
             <div className="mb-3 p-3 bg-red-50 border-2 border-red-500 rounded-xl">

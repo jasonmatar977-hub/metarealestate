@@ -11,6 +11,7 @@
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
+import Comments from "@/components/Comments";
 
 interface PostCardProps {
   postId: number;
@@ -41,6 +42,7 @@ export default function PostCard({
   const [isLiking, setIsLiking] = useState(false);
   const [currentLikes, setCurrentLikes] = useState(likes);
   const [currentUserLiked, setCurrentUserLiked] = useState(initialUserLiked);
+  const [showComments, setShowComments] = useState(false);
 
   const handleLike = async () => {
     if (!user || isLiking) return;
@@ -127,7 +129,10 @@ export default function PostCard({
           <span>{currentUserLiked ? "❤️" : "🤍"}</span>
           <span>{currentLikes}</span>
         </button>
-        <button className="flex items-center space-x-2 hover:text-gold transition-colors">
+        <button
+          onClick={() => setShowComments(!showComments)}
+          className="flex items-center space-x-2 hover:text-gold transition-colors"
+        >
           <span>💬</span>
           <span>{comments}</span>
         </button>
@@ -136,6 +141,13 @@ export default function PostCard({
           <span className="hidden sm:inline">Share</span>
         </button>
       </div>
+
+      {/* Comments Section */}
+      {showComments && (
+        <div className="px-4 pb-4">
+          <Comments postId={postId} initialShowAll={false} />
+        </div>
+      )}
     </div>
   );
 }
