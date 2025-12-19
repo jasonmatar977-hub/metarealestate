@@ -12,7 +12,7 @@
  * - Secure session management
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase, getSupabaseConfigError } from "@/lib/supabaseClient";
@@ -21,14 +21,25 @@ import { validateEmail, validatePassword, getEmailError, getPasswordError } from
 
 export default function LoginForm() {
   const router = useRouter();
-  const { login, isLoading: authLoading } = useAuth();
+  const { login, isAuthenticated, isLoading: authLoading, loadingSession } = useAuth();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false); // Separate state for form submission only
+  const [checkingSession, setCheckingSession] = useState(true); // Separate state for session check
   const [configError, setConfigError] = useState<string | null>(null);
+  const hasRedirectedRef = useRef(false); // Prevent multiple redirects
+
+  // Hard reset all state on mount
+  useEffect(() => {
+    console.log('[LoginForm] Component mounted - hard resetting state');
+    setIsSubmitting(false);
+    setErrors({});
+    setCheckingSession(true);
+    hasRedirectedRef.current = false;
+  }, []);
 
   // Check Supabase configuration on mount
   useEffect(() => {
@@ -38,6 +49,29 @@ export default function LoginForm() {
       setConfigError(error);
     }
   }, []);
+
+  // Check session and redirect if already authenticated (separate from form submission)
+  useEffect(() => {
+    // Wait for AuthContext to finish loading session
+    if (loadingSession || authLoading) {
+      console.log('[LoginForm] Waiting for session check to complete...');
+      return;
+    }
+
+    console.log('[LoginForm] Session check complete:', { isAuthenticated, hasRedirected: hasRedirectedRef.current });
+
+    // If user is already authenticated, redirect cleanly WITHOUT setting isSubmitting
+    if (isAuthenticated && !hasRedirectedRef.current) {
+      console.log('[LoginForm] User already authenticated, redirecting to /feed (clean redirect, no loading state)');
+      hasRedirectedRef.current = true;
+      setCheckingSession(false);
+      router.push("/feed");
+      return;
+    }
+
+    // Session check complete, user is not authenticated
+    setCheckingSession(false);
+  }, [isAuthenticated, loadingSession, authLoading, router]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -50,6 +84,11 @@ export default function LoginForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('[LoginForm] Form submit started');
+
+    // Hard reset errors on new submit attempt
+    setErrors({});
+
     const newErrors: Record<string, string> = {};
 
     // Validate email
@@ -65,11 +104,15 @@ export default function LoginForm() {
     }
 
     if (Object.keys(newErrors).length > 0) {
+      console.log('[LoginForm] Validation errors, not submitting');
       setErrors(newErrors);
+      setIsSubmitting(false); // Ensure loading is false on early return
       return;
     }
 
-    setIsLoading(true);
+    // Set submitting state ONLY when actually submitting
+    console.log('[LoginForm] Starting login submission...');
+    setIsSubmitting(true);
     setErrors({}); // Clear previous errors
     
     try {
@@ -78,11 +121,11 @@ export default function LoginForm() {
       if (configErr) {
         console.error("[LoginForm] Supabase not configured:", configErr);
         setErrors({ submit: "Supabase is not configured. Please check your environment variables." });
-        setIsLoading(false);
+        setIsSubmitting(false);
         return;
       }
 
-      console.log("[LoginForm] Attempting login...");
+      console.log("[LoginForm] Calling login()...");
       
       // Use AuthContext login function which handles state updates
       const success = await login(formData.email, formData.password);
@@ -90,14 +133,15 @@ export default function LoginForm() {
       if (success) {
         // Success - wait a moment for auth state to update, then redirect
         console.log("[LoginForm] Login successful, redirecting to /feed...");
+        setIsSubmitting(false); // Reset before redirect
         // Small delay to ensure auth state is updated
         setTimeout(() => {
           router.push("/feed");
         }, 100);
       } else {
-        console.error("[LoginForm] Login failed");
+        console.error("[LoginForm] Login failed - invalid credentials");
         setErrors({ submit: "Invalid email or password. Please try again." });
-        setIsLoading(false);
+        setIsSubmitting(false);
       }
     } catch (error: any) {
       console.error("[LoginForm] Login exception:", {
@@ -112,7 +156,11 @@ export default function LoginForm() {
       } else {
         setErrors({ submit: error?.message || "An error occurred. Please try again." });
       }
-      setIsLoading(false);
+      setIsSubmitting(false);
+    } finally {
+      // ALWAYS reset submitting state, even if we return early
+      console.log('[LoginForm] Form submit finished, resetting isSubmitting');
+      setIsSubmitting(false);
     }
   };
 
@@ -192,10 +240,10 @@ export default function LoginForm() {
 
             <button
               type="submit"
-              disabled={isLoading || authLoading}
+              disabled={isSubmitting}
               className="w-full px-8 py-4 bg-gradient-to-r from-gold to-gold-light text-gray-900 font-bold rounded-xl hover:shadow-xl hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isLoading || authLoading ? "Signing in..." : "Sign In"}
+              {isSubmitting ? "Signing in..." : "Sign In"}
             </button>
           </form>
 
