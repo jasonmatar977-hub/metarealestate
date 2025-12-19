@@ -35,3 +35,4 @@ WHERE tablename = 'posts' AND policyname = 'Users can delete their own posts';
 
 
 
+

@@ -72,6 +72,23 @@ export default function Navbar() {
                   {t('navbar.feed')}
                 </Link>
                 <Link
+                  href="/search"
+                  className="px-4 py-2 text-gray-700 hover:text-gold transition-colors font-semibold"
+                  title="Search Users"
+                >
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </Link>
+                <Link
                   href="/chat"
                   className="px-4 py-2 text-gray-700 hover:text-gold transition-colors font-semibold"
                 >
@@ -178,6 +195,24 @@ export default function Navbar() {
                     className="px-4 py-2 text-gray-700 hover:text-gold hover:bg-gold/10 transition-colors font-semibold rounded-lg"
                   >
                     {t('navbar.feed')}
+                  </Link>
+                  <Link
+                    href="/search"
+                    onClick={closeMobileMenu}
+                    className="px-4 py-2 text-gray-700 hover:text-gold hover:bg-gold/10 transition-colors font-semibold rounded-lg flex items-center gap-2"
+                  >
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    Search
                   </Link>
                   <Link
                     href="/chat"
