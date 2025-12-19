@@ -21,7 +21,7 @@ import { validateEmail, validatePassword, getEmailError, getPasswordError } from
 
 export default function LoginForm() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, isLoading: authLoading } = useAuth();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -82,39 +82,22 @@ export default function LoginForm() {
         return;
       }
 
-      console.log("[LoginForm] Attempting login with Supabase URL:", process.env.NEXT_PUBLIC_SUPABASE_URL?.substring(0, 30) + '...');
+      console.log("[LoginForm] Attempting login...");
       
-      // Call signInWithPassword directly with proper error handling
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: formData.email,
-        password: formData.password,
-      });
+      // Use AuthContext login function which handles state updates
+      const success = await login(formData.email, formData.password);
 
-      // Log for debugging
-      console.log("[LoginForm] Login response:", { hasData: !!data, hasError: !!error, userId: data?.user?.id });
-      
-      if (error) {
-        console.error("[LoginForm] Login error:", {
-          message: error.message,
-          status: error.status,
-          name: error.name
-        });
-        
-        // Handle "Failed to fetch" errors specifically
-        if (error.message?.includes('Failed to fetch') || error.message?.includes('fetch')) {
-          setErrors({ submit: "Cannot connect to Supabase. Please check your internet connection and ensure NEXT_PUBLIC_SUPABASE_URL is set correctly in .env.local" });
-        } else {
-          setErrors({ submit: error.message || "Invalid email or password. Please try again." });
-        }
-        return;
-      }
-
-      if (data?.user) {
-        // Success - redirect to listings
-        console.log("[LoginForm] Login successful, redirecting...");
-        router.push("/listings");
+      if (success) {
+        // Success - wait a moment for auth state to update, then redirect
+        console.log("[LoginForm] Login successful, redirecting to /feed...");
+        // Small delay to ensure auth state is updated
+        setTimeout(() => {
+          router.push("/feed");
+        }, 100);
       } else {
-        setErrors({ submit: "Login failed. Please try again." });
+        console.error("[LoginForm] Login failed");
+        setErrors({ submit: "Invalid email or password. Please try again." });
+        setIsLoading(false);
       }
     } catch (error: any) {
       console.error("[LoginForm] Login exception:", {
@@ -129,8 +112,6 @@ export default function LoginForm() {
       } else {
         setErrors({ submit: error?.message || "An error occurred. Please try again." });
       }
-    } finally {
-      // Always reset loading state
       setIsLoading(false);
     }
   };
@@ -211,10 +192,10 @@ export default function LoginForm() {
 
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || authLoading}
               className="w-full px-8 py-4 bg-gradient-to-r from-gold to-gold-light text-gray-900 font-bold rounded-xl hover:shadow-xl hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isLoading ? "Signing in..." : "Sign In"}
+              {isLoading || authLoading ? "Signing in..." : "Sign In"}
             </button>
           </form>
 
