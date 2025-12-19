@@ -130,7 +130,7 @@ export default function ProfilePage() {
       const { count: followersCount } = await supabase
         .from('follows')
         .select('*', { count: 'exact', head: true })
-        .eq('following_id', user.id);
+        .eq('followed_id', user.id);
       setFollowersCount(followersCount || 0);
 
       // Following count

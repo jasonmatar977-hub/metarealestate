@@ -1,0 +1,318 @@
+"use client";
+
+/**
+ * User Search Page
+ * Route: /search
+ * Instagram-like user search with follow/unfollow functionality
+ */
+
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabaseClient";
+import Navbar from "@/components/Navbar";
+import MobileBottomNav from "@/components/MobileBottomNav";
+import Link from "next/link";
+
+interface UserProfile {
+  id: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  bio: string | null;
+  isFollowing?: boolean;
+}
+
+export default function SearchPage() {
+  const { isAuthenticated, user } = useAuth();
+  const router = useRouter();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [followingMap, setFollowingMap] = useState<Record<string, boolean>>({});
+
+  // Load following status for current user
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      loadFollowingStatus();
+    }
+  }, [isAuthenticated, user]);
+
+  // Search users when query changes (debounced)
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    const debounceTimer = setTimeout(() => {
+      searchUsers(searchQuery);
+    }, 300);
+
+    return () => clearTimeout(debounceTimer);
+  }, [searchQuery]);
+
+  const loadFollowingStatus = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from("follows")
+        .select("followed_id")
+        .eq("follower_id", user.id);
+
+      if (error) {
+        console.error("Error loading following status:", error);
+        return;
+      }
+
+      const following: Record<string, boolean> = {};
+      (data || []).forEach((follow) => {
+        following[follow.followed_id] = true;
+      });
+      setFollowingMap(following);
+    } catch (error) {
+      console.error("Error in loadFollowingStatus:", error);
+    }
+  };
+
+  const searchUsers = async (query: string) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    try {
+      setIsSearching(true);
+      const searchLower = query.toLowerCase().trim();
+
+      // Search profiles by display_name (case-insensitive)
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, display_name, avatar_url, bio")
+        .ilike("display_name", `%${searchLower}%`)
+        .limit(20);
+
+      if (error) {
+        console.error("Error searching users:", error);
+        setSearchResults([]);
+        return;
+      }
+
+      // Filter out current user and map following status
+      const results = (data || [])
+        .filter((profile) => profile.id !== user?.id)
+        .map((profile) => ({
+          ...profile,
+          isFollowing: followingMap[profile.id] || false,
+        }));
+
+      setSearchResults(results);
+    } catch (error) {
+      console.error("Error in searchUsers:", error);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleFollowToggle = async (targetUserId: string, currentlyFollowing: boolean) => {
+    if (!user || !isAuthenticated) {
+      router.push("/login");
+      return;
+    }
+
+    try {
+      if (currentlyFollowing) {
+        // Unfollow: Delete the follow relationship
+        const { error } = await supabase
+          .from("follows")
+          .delete()
+          .eq("follower_id", user.id)
+          .eq("followed_id", targetUserId);
+
+        if (error) throw error;
+
+        // Optimistic update
+        setFollowingMap((prev) => ({ ...prev, [targetUserId]: false }));
+        setSearchResults((prev) =>
+          prev.map((profile) =>
+            profile.id === targetUserId ? { ...profile, isFollowing: false } : profile
+          )
+        );
+      } else {
+        // Follow: Create the follow relationship
+        const { error } = await supabase
+          .from("follows")
+          .insert({
+            follower_id: user.id,
+            followed_id: targetUserId,
+          });
+
+        if (error) throw error;
+
+        // Optimistic update
+        setFollowingMap((prev) => ({ ...prev, [targetUserId]: true }));
+        setSearchResults((prev) =>
+          prev.map((profile) =>
+            profile.id === targetUserId ? { ...profile, isFollowing: true } : profile
+          )
+        );
+      }
+    } catch (error: any) {
+      console.error("Error toggling follow:", error);
+      // Revert optimistic update on error
+      await loadFollowingStatus();
+      await searchUsers(searchQuery);
+    }
+  };
+
+  const getInitials = (name: string | null | undefined, userId: string) => {
+    if (name) {
+      return name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2);
+    }
+    return userId.slice(0, 2).toUpperCase() || "U";
+  };
+
+  return (
+    <main className="min-h-screen">
+      <Navbar />
+      <div className="pt-24 pb-20 px-4">
+        <div className="max-w-2xl mx-auto w-full">
+          <h1 className="font-orbitron text-3xl sm:text-4xl font-bold text-center mb-6 text-gold-dark">
+            Search Users
+          </h1>
+
+          {/* Search Input */}
+          <div className="glass-dark rounded-2xl p-4 mb-6">
+            <div className="flex items-center gap-3">
+              <svg
+                className="w-6 h-6 text-gray-600"
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                type="text"
+                placeholder="Search by name..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="flex-1 bg-transparent border-none outline-none text-gray-900 placeholder-gray-500"
+              />
+              {isSearching && (
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gold"></div>
+              )}
+            </div>
+          </div>
+
+          {/* Search Results */}
+          {searchQuery.trim() && (
+            <div className="space-y-3">
+              {isSearching ? (
+                <div className="text-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gold mx-auto mb-4"></div>
+                  <p className="text-gray-600">Searching...</p>
+                </div>
+              ) : searchResults.length === 0 ? (
+                <div className="glass-dark rounded-2xl p-12 text-center">
+                  <p className="text-gray-600">No users found</p>
+                </div>
+              ) : (
+                searchResults.map((profile) => {
+                  const displayName = profile.display_name || "User";
+                  const initials = getInitials(profile.display_name, profile.id);
+                  const isFollowing = profile.isFollowing || false;
+
+                  return (
+                    <div
+                      key={profile.id}
+                      className="glass-dark rounded-2xl p-4 flex items-center gap-4 hover:bg-gold/5 transition-colors"
+                    >
+                      {/* Avatar */}
+                      <Link href={`/u/${profile.id}`} className="flex-shrink-0">
+                        {profile.avatar_url ? (
+                          <img
+                            src={profile.avatar_url}
+                            alt={displayName}
+                            className="w-14 h-14 rounded-full object-cover"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = "none";
+                              const parent = target.parentElement;
+                              if (parent) {
+                                const fallback = document.createElement("div");
+                                fallback.className =
+                                  "w-14 h-14 rounded-full bg-gradient-to-r from-gold to-gold-light flex items-center justify-center text-gray-900 font-bold text-lg";
+                                fallback.textContent = initials;
+                                parent.appendChild(fallback);
+                              }
+                            }}
+                          />
+                        ) : (
+                          <div className="w-14 h-14 rounded-full bg-gradient-to-r from-gold to-gold-light flex items-center justify-center text-gray-900 font-bold text-lg">
+                            {initials}
+                          </div>
+                        )}
+                      </Link>
+
+                      {/* User Info */}
+                      <Link href={`/u/${profile.id}`} className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-gray-900 truncate">{displayName}</h3>
+                        {profile.bio && (
+                          <p className="text-sm text-gray-600 truncate">{profile.bio}</p>
+                        )}
+                      </Link>
+
+                      {/* Follow Button */}
+                      {isAuthenticated && user && user.id !== profile.id && (
+                        <button
+                          onClick={() => handleFollowToggle(profile.id, isFollowing)}
+                          className={`px-4 py-2 rounded-xl font-semibold transition-all flex-shrink-0 ${
+                            isFollowing
+                              ? "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                              : "bg-gradient-to-r from-gold to-gold-light text-gray-900 hover:shadow-lg"
+                          }`}
+                        >
+                          {isFollowing ? "Following" : "Follow"}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+
+          {/* Empty State - No Search Query */}
+          {!searchQuery.trim() && (
+            <div className="glass-dark rounded-2xl p-12 text-center">
+              <svg
+                className="w-16 h-16 text-gray-400 mx-auto mb-4"
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <p className="text-gray-600">Search for users by name</p>
+            </div>
+          )}
+        </div>
+      </div>
+      <MobileBottomNav />
+    </main>
+  );
+}
+

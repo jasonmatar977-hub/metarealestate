@@ -11,6 +11,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
 import Navbar from "@/components/Navbar";
@@ -35,17 +36,21 @@ interface Post {
   comments_count?: number;
 }
 
+type FeedTab = "foryou" | "following";
+
 export default function FeedPage() {
   const { isAuthenticated, isLoading, loadingSession, user } = useAuth();
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState<FeedTab>("foryou");
   const [posts, setPosts] = useState<Post[]>([]);
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasRedirected, setHasRedirected] = useState(false); // Prevent infinite redirect loops
   const [deletingPostId, setDeletingPostId] = useState<number | null>(null); // Track which post is being deleted
+  const [suggestedUsers, setSuggestedUsers] = useState<any[]>([]);
 
   // Load posts from Supabase with fallback approach
-  const loadPosts = async () => {
+  const loadPosts = async (tab: FeedTab = activeTab) => {
     if (!isAuthenticated || !user) return;
 
     // Check if Supabase is properly configured
@@ -63,14 +68,48 @@ export default function FeedPage() {
       console.log("=== LOADING POSTS ===");
       console.log("User authenticated:", isAuthenticated);
       console.log("User ID:", user?.id);
+      console.log("Feed tab:", tab);
       console.log("Supabase URL:", process.env.NEXT_PUBLIC_SUPABASE_URL ? "Set" : "NOT SET");
 
-      // Step 1: Fetch posts (simple query, no join)
-      const { data: postsData, error: postsError } = await supabase
+      // Step 1: Get followed user IDs if "Following" tab
+      let followedUserIds: string[] = [];
+      if (tab === "following") {
+        if (!user) {
+          setPosts([]);
+          setIsLoadingPosts(false);
+          return;
+        }
+        const { data: followsData, error: followsError } = await supabase
+          .from("follows")
+          .select("followed_id")
+          .eq("follower_id", user.id);
+
+        if (followsError) {
+          console.error("Error loading follows:", followsError);
+        } else {
+          followedUserIds = (followsData || []).map((f) => f.followed_id);
+          if (followedUserIds.length === 0) {
+            // No follows, load suggested users
+            loadSuggestedUsers();
+            setPosts([]);
+            setIsLoadingPosts(false);
+            return;
+          }
+        }
+      }
+
+      // Step 2: Fetch posts (filtered by followed users if "Following" tab)
+      let postsQuery = supabase
         .from('posts')
         .select('id, user_id, content, created_at, image_url')
         .order('created_at', { ascending: false })
         .limit(50);
+
+      if (tab === "following" && followedUserIds.length > 0) {
+        postsQuery = postsQuery.in('user_id', followedUserIds);
+      }
+
+      const { data: postsData, error: postsError } = await postsQuery;
 
       if (postsError) {
         console.error("=== POSTS ERROR ===");
@@ -90,11 +129,11 @@ export default function FeedPage() {
         return;
       }
 
-      // Step 2: Get unique user IDs from posts
+      // Step 3: Get unique user IDs from posts
       const userIds = [...new Set(postsData.map((p) => p.user_id))];
       console.log("Unique user IDs:", userIds);
 
-      // Step 3: Fetch profiles for these users
+      // Step 4: Fetch profiles for these users
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
         .select('id, display_name')
@@ -112,7 +151,7 @@ export default function FeedPage() {
 
       console.log("Profiles fetched:", profilesData?.length || 0);
 
-      // Step 4: Get like counts and user's likes
+      // Step 5: Get like counts and user's likes
       const postIds = postsData.map((p) => p.id);
       const { data: likesData, error: likesError } = await supabase
         .from('likes')
@@ -129,7 +168,7 @@ export default function FeedPage() {
         // Continue without likes if error
       }
 
-      // Step 5: Get comment counts
+      // Step 6: Get comment counts
       const { data: commentsData, error: commentsError } = await supabase
         .from('comments')
         .select('post_id')
@@ -141,7 +180,7 @@ export default function FeedPage() {
         // Continue without comment counts if error
       }
 
-      // Step 6: Merge data
+      // Step 7: Merge data
       const profilesMap = new Map(
         (profilesData || []).map((p) => [p.id, p])
       );
@@ -198,9 +237,29 @@ export default function FeedPage() {
 
   useEffect(() => {
     if (isAuthenticated && user) {
-      loadPosts();
+      loadPosts(activeTab);
     }
-  }, [isAuthenticated, user?.id]);
+  }, [isAuthenticated, user?.id, activeTab]);
+
+  const loadSuggestedUsers = async () => {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, display_name, avatar_url")
+        .neq("id", user.id)
+        .limit(5)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Error loading suggested users:", error);
+      } else {
+        setSuggestedUsers(data || []);
+      }
+    } catch (error) {
+      console.error("Error in loadSuggestedUsers:", error);
+    }
+  };
 
   // Show loading state while checking auth or initial session
   if (loadingSession || isLoading) {
@@ -277,12 +336,42 @@ export default function FeedPage() {
             Stay updated with the latest from our community
           </p>
 
+          {/* Feed Tabs */}
+          <div className="flex gap-2 mb-6 border-b border-gold/20">
+            <button
+              onClick={() => setActiveTab("foryou")}
+              className={`flex-1 py-3 font-semibold transition-colors ${
+                activeTab === "foryou"
+                  ? "text-gold border-b-2 border-gold"
+                  : "text-gray-600 hover:text-gold"
+              }`}
+            >
+              For You
+            </button>
+            <button
+              onClick={() => {
+                if (!isAuthenticated) {
+                  setError("Log in to see posts from people you follow");
+                  return;
+                }
+                setActiveTab("following");
+              }}
+              className={`flex-1 py-3 font-semibold transition-colors ${
+                activeTab === "following"
+                  ? "text-gold border-b-2 border-gold"
+                  : "text-gray-600 hover:text-gold"
+              }`}
+            >
+              Following
+            </button>
+          </div>
+
           {/* Error Message */}
           {error && (
             <div className="mb-6 p-4 bg-red-50 border-2 border-red-500 rounded-xl">
               <p className="text-red-600 text-sm">{error}</p>
               <button
-                onClick={loadPosts}
+                onClick={() => loadPosts(activeTab)}
                 className="mt-2 text-red-600 hover:text-red-800 text-sm font-semibold underline"
               >
                 Retry
@@ -301,13 +390,63 @@ export default function FeedPage() {
             </div>
           ) : posts.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-gray-600 mb-4">No posts yet. Be the first to post!</p>
-              <button
-                onClick={loadPosts}
-                className="text-gold hover:text-gold-dark font-semibold underline"
-              >
-                Refresh
-              </button>
+              {activeTab === "following" ? (
+                <div className="glass-dark rounded-2xl p-8">
+                  <p className="text-gray-600 mb-4">Follow people to see their posts</p>
+                  {suggestedUsers.length > 0 && (
+                    <div className="mt-6">
+                      <h3 className="font-semibold text-gray-900 mb-4">Suggested Users</h3>
+                      <div className="space-y-3">
+                        {suggestedUsers.map((profile) => {
+                          const displayName = profile.display_name || "User";
+                          const initials = displayName
+                            .split(" ")
+                            .map((n: string) => n[0])
+                            .join("")
+                            .toUpperCase()
+                            .slice(0, 2);
+                          return (
+                            <Link
+                              key={profile.id}
+                              href={`/u/${profile.id}`}
+                              className="flex items-center gap-3 p-3 bg-white/50 rounded-xl hover:bg-gold/10 transition-colors"
+                            >
+                              {profile.avatar_url ? (
+                                <img
+                                  src={profile.avatar_url}
+                                  alt={displayName}
+                                  className="w-12 h-12 rounded-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-12 h-12 rounded-full bg-gradient-to-r from-gold to-gold-light flex items-center justify-center text-gray-900 font-bold">
+                                  {initials}
+                                </div>
+                              )}
+                              <span className="font-semibold text-gray-900">{displayName}</span>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  <Link
+                    href="/search"
+                    className="inline-block mt-4 px-6 py-2 bg-gradient-to-r from-gold to-gold-light text-gray-900 font-bold rounded-xl hover:shadow-lg transition-all"
+                  >
+                    Search Users
+                  </Link>
+                </div>
+              ) : (
+                <>
+                  <p className="text-gray-600 mb-4">No posts yet. Be the first to post!</p>
+                  <button
+                    onClick={() => loadPosts(activeTab)}
+                    className="text-gold hover:text-gold-dark font-semibold underline"
+                  >
+                    Refresh
+                  </button>
+                </>
+              )}
             </div>
           ) : (
             <div className="space-y-6">
@@ -342,7 +481,7 @@ export default function FeedPage() {
                       setPosts((prevPosts) => prevPosts.filter((p) => p.id !== post.id));
                       // Then refresh to get accurate counts
                       setTimeout(() => {
-                        loadPosts();
+                        loadPosts(activeTab);
                       }, 100);
                     }}
                   />
