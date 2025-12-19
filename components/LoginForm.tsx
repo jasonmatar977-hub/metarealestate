@@ -12,9 +12,10 @@
  * - Secure session management
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { supabase, getSupabaseConfigError } from "@/lib/supabaseClient";
 import { useAuth } from "@/contexts/AuthContext";
 import { validateEmail, validatePassword, getEmailError, getPasswordError } from "@/lib/validation";
 
@@ -27,6 +28,16 @@ export default function LoginForm() {
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [configError, setConfigError] = useState<string | null>(null);
+
+  // Check Supabase configuration on mount
+  useEffect(() => {
+    const error = getSupabaseConfigError();
+    if (error) {
+      console.error('[LoginForm] Supabase configuration error:', error);
+      setConfigError(error);
+    }
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -59,18 +70,67 @@ export default function LoginForm() {
     }
 
     setIsLoading(true);
+    setErrors({}); // Clear previous errors
+    
     try {
-      // SECURITY: In production, this should call a backend API
-      // that validates credentials server-side
-      const success = await login(formData.email, formData.password);
-      if (success) {
+      // Check Supabase configuration before attempting login
+      const configErr = getSupabaseConfigError();
+      if (configErr) {
+        console.error("[LoginForm] Supabase not configured:", configErr);
+        setErrors({ submit: "Supabase is not configured. Please check your environment variables." });
+        setIsLoading(false);
+        return;
+      }
+
+      console.log("[LoginForm] Attempting login with Supabase URL:", process.env.NEXT_PUBLIC_SUPABASE_URL?.substring(0, 30) + '...');
+      
+      // Call signInWithPassword directly with proper error handling
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password,
+      });
+
+      // Log for debugging
+      console.log("[LoginForm] Login response:", { hasData: !!data, hasError: !!error, userId: data?.user?.id });
+      
+      if (error) {
+        console.error("[LoginForm] Login error:", {
+          message: error.message,
+          status: error.status,
+          name: error.name
+        });
+        
+        // Handle "Failed to fetch" errors specifically
+        if (error.message?.includes('Failed to fetch') || error.message?.includes('fetch')) {
+          setErrors({ submit: "Cannot connect to Supabase. Please check your internet connection and ensure NEXT_PUBLIC_SUPABASE_URL is set correctly in .env.local" });
+        } else {
+          setErrors({ submit: error.message || "Invalid email or password. Please try again." });
+        }
+        return;
+      }
+
+      if (data?.user) {
+        // Success - redirect to listings
+        console.log("[LoginForm] Login successful, redirecting...");
         router.push("/listings");
       } else {
-        setErrors({ submit: "Invalid email or password. Please try again." });
+        setErrors({ submit: "Login failed. Please try again." });
       }
-    } catch (error) {
-      setErrors({ submit: "An error occurred. Please try again." });
+    } catch (error: any) {
+      console.error("[LoginForm] Login exception:", {
+        message: error?.message,
+        name: error?.name,
+        stack: error?.stack
+      });
+      
+      // Handle network/fetch errors
+      if (error?.message?.includes('Failed to fetch') || error?.message?.includes('fetch') || error?.name === 'TypeError') {
+        setErrors({ submit: "Network error: Cannot connect to Supabase. Please check your .env.local file and restart the dev server." });
+      } else {
+        setErrors({ submit: error?.message || "An error occurred. Please try again." });
+      }
     } finally {
+      // Always reset loading state
       setIsLoading(false);
     }
   };
@@ -83,6 +143,17 @@ export default function LoginForm() {
             Welcome Back
           </h1>
           <p className="text-center text-gray-600 mb-8">Sign in to your account</p>
+
+          {/* Supabase Configuration Error */}
+          {configError && (
+            <div className="mb-6 p-4 bg-red-50 border-2 border-red-500 rounded-xl">
+              <p className="text-red-600 text-sm font-semibold mb-2">⚠️ Configuration Error</p>
+              <p className="text-red-600 text-sm">{configError}</p>
+              <p className="text-red-600 text-xs mt-2">
+                Please create <code className="bg-red-100 px-1 rounded">.env.local</code> in your project root with your Supabase credentials.
+              </p>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>

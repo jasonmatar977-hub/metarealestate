@@ -22,8 +22,9 @@ interface Message {
 }
 
 export default function ChatPage() {
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, loadingSession } = useAuth();
   const router = useRouter();
+  const [hasRedirected, setHasRedirected] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
@@ -37,11 +38,12 @@ export default function ChatPage() {
 
   useEffect(() => {
     // SECURITY: Front-end route protection
-    // TODO: Implement server-side protection with middleware/API routes
-    if (!authLoading && !isAuthenticated) {
+    // Do not redirect until initial session check completes
+    if (!loadingSession && !authLoading && !isAuthenticated && !hasRedirected) {
+      setHasRedirected(true);
       router.push("/login");
     }
-  }, [isAuthenticated, authLoading, router]);
+  }, [isAuthenticated, authLoading, loadingSession, router, hasRedirected]);
 
   useEffect(() => {
     // Auto-scroll to bottom when new messages arrive

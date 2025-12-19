@@ -25,8 +25,9 @@ interface ProfileData {
 }
 
 export default function EditProfilePage() {
-  const { isAuthenticated, isLoading: authLoading, user } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, loadingSession, user } = useAuth();
   const router = useRouter();
+  const [hasRedirected, setHasRedirected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,10 +43,12 @@ export default function EditProfilePage() {
   });
 
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
+    // Do not redirect until initial session check completes
+    if (!loadingSession && !authLoading && !isAuthenticated && !hasRedirected) {
+      setHasRedirected(true);
       router.push("/login");
     }
-  }, [isAuthenticated, authLoading, router]);
+  }, [isAuthenticated, authLoading, loadingSession, router, hasRedirected]);
 
   useEffect(() => {
     const loadProfile = async () => {

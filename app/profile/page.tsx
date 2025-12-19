@@ -29,8 +29,9 @@ interface Profile {
 }
 
 export default function ProfilePage() {
-  const { isAuthenticated, isLoading: authLoading, user } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, loadingSession, user } = useAuth();
   const router = useRouter();
+  const [hasRedirected, setHasRedirected] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [userPosts, setUserPosts] = useState<any[]>([]);
@@ -39,10 +40,12 @@ export default function ProfilePage() {
   const [followingCount, setFollowingCount] = useState(0);
 
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
+    // Do not redirect until initial session check completes
+    if (!loadingSession && !authLoading && !isAuthenticated && !hasRedirected) {
+      setHasRedirected(true);
       router.push("/login");
     }
-  }, [isAuthenticated, authLoading, router]);
+  }, [isAuthenticated, authLoading, loadingSession, router, hasRedirected]);
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -304,6 +307,7 @@ export default function ProfilePage() {
                   <PostCard
                     key={post.id}
                     postId={post.id}
+                    userId={post.user_id}
                     username={displayName}
                     avatar={getInitials(displayName, user?.id || '')}
                     timestamp={formatTimestamp(post.created_at)}
@@ -313,6 +317,20 @@ export default function ProfilePage() {
                     userLiked={false}
                     comments={0}
                     onLikeToggle={() => {}}
+                    onPostDeleted={async () => {
+                      // Reload profile posts after deletion
+                      if (user) {
+                        const { data } = await supabase
+                          .from('posts')
+                          .select('*')
+                          .eq('user_id', user.id)
+                          .order('created_at', { ascending: false });
+                        if (data) {
+                          setUserPosts(data);
+                          setPostsCount(data.length);
+                        }
+                      }
+                    }}
                   />
                 ))}
               </div>
