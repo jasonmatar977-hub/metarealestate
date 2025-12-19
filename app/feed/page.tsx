@@ -12,7 +12,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
 import Navbar from "@/components/Navbar";
 import PostCard from "@/components/PostCard";
 import CreatePost from "@/components/CreatePost";
@@ -33,15 +33,24 @@ interface Post {
 }
 
 export default function FeedPage() {
-  const { isAuthenticated, isLoading, user } = useAuth();
+  const { isAuthenticated, isLoading, loadingSession, user } = useAuth();
   const router = useRouter();
   const [posts, setPosts] = useState<Post[]>([]);
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hasRedirected, setHasRedirected] = useState(false); // Prevent infinite redirect loops
 
   // Load posts from Supabase with fallback approach
   const loadPosts = async () => {
     if (!isAuthenticated || !user) return;
+
+    // Check if Supabase is properly configured
+    if (!isSupabaseConfigured()) {
+      console.error("⚠️ Supabase not configured. Please set environment variables in Vercel.");
+      setError("Supabase is not configured. Please contact support.");
+      setIsLoadingPosts(false);
+      return;
+    }
 
     try {
       setIsLoadingPosts(true);
@@ -50,6 +59,7 @@ export default function FeedPage() {
       console.log("=== LOADING POSTS ===");
       console.log("User authenticated:", isAuthenticated);
       console.log("User ID:", user?.id);
+      console.log("Supabase URL:", process.env.NEXT_PUBLIC_SUPABASE_URL ? "Set" : "NOT SET");
 
       // Step 1: Fetch posts (simple query, no join)
       const { data: postsData, error: postsError } = await supabase
@@ -166,10 +176,13 @@ export default function FeedPage() {
 
   useEffect(() => {
     // SECURITY: Front-end route protection
-    if (!isLoading && !isAuthenticated) {
+    // Do not redirect until initial session check completes
+    // Prevent infinite redirect loops
+    if (!loadingSession && !isLoading && !isAuthenticated && !hasRedirected) {
+      setHasRedirected(true);
       router.push("/login");
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [isAuthenticated, isLoading, loadingSession, router, hasRedirected]);
 
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -177,8 +190,8 @@ export default function FeedPage() {
     }
   }, [isAuthenticated, user?.id]);
 
-  // Show loading state while checking auth
-  if (isLoading) {
+  // Show loading state while checking auth or initial session
+  if (loadingSession || isLoading) {
     return (
       <main className="min-h-screen flex items-center justify-center">
         <div className="text-center">
