@@ -9,6 +9,9 @@ A modern, AI-powered real estate platform built with Next.js 15, React, and Tail
 - **Property Listings**: Enhanced listings with search, filters, and sorting
 - **News Feed**: Instagram/Facebook-style vertical feed with posts, likes, and comments
 - **User Profiles**: Instagram-like profile pages with edit functionality
+- **Direct Messages (DM)**: Real-time messaging system with conversation inbox and chat views
+- **Follow System**: Follow/unfollow users and view posts from people you follow
+- **User Search**: Search for users by name and start conversations
 - **AI Chatbot**: Full integration with OpenAI ChatGPT API (currently disabled for deployment)
 - **Multi-Language Support**: i18n with English, Arabic (RTL), Chinese, and German
 - **Comments System**: Full comment and comment-like functionality on feed posts
@@ -37,6 +40,9 @@ myproject/
 │   ├── listings/          # Property listings page
 │   ├── login/             # Login page
 │   ├── register/          # Registration page
+│   ├── messages/          # Direct messages (inbox and chat)
+│   ├── search/            # User search page
+│   ├── u/[id]/            # Public user profile page
 │   ├── layout.tsx         # Root layout
 │   ├── page.tsx           # Landing page
 │   └── globals.css        # Global styles
@@ -62,12 +68,14 @@ myproject/
 │   └── LanguageContext.tsx # i18n language context
 ├── lib/                   # Utility functions
 │   ├── validation.ts      # Form validation helpers
-│   └── supabaseClient.ts  # Supabase client
+│   ├── supabaseClient.ts  # Supabase client
+│   └── messages.ts        # DM helper functions (find/create conversations)
 ├── supabase/              # Database SQL files
 │   ├── schema.sql         # Main database schema
 │   ├── rls_policies.sql   # RLS policies
 │   ├── profile_upgrade.sql # Profile enhancements
-│   └── comments.sql       # Comments tables
+│   ├── comments.sql       # Comments tables
+│   └── messages_phase2.sql # DM tables (conversations, messages)
 ├── package.json           # Dependencies
 ├── tsconfig.json          # TypeScript config
 ├── tailwind.config.ts     # Tailwind CSS config
@@ -106,6 +114,8 @@ myproject/
      2. `supabase/rls_policies.sql` - Sets up Row Level Security policies
      3. `supabase/profile_upgrade.sql` - Adds profile fields (bio, avatar_url, location, etc.)
      4. `supabase/comments.sql` - Creates comments and comment_likes tables
+     5. `supabase/messages_phase2.sql` - Creates conversations, conversation_participants, and messages tables for DM
+   - **Enable Realtime**: Go to Database → Replication → Enable replication for `messages` table
 
 4. **Run the development server:**
    ```bash
@@ -139,11 +149,15 @@ npm run lint
 ## 📝 Routes
 
 - `/` - Landing page with hero, about, services, testimonials, and contact sections
-- `/login` - Login page (redirects to `/listings` on success)
-- `/register` - Registration page (redirects to `/listings` on success)
+- `/login` - Login page (redirects to `/feed` on success)
+- `/register` - Registration page (redirects to `/feed` on success)
 - `/listings` - Enhanced property listings with search, filters, and sorting (protected)
 - `/feed` - News feed with posts, likes, and comments (protected)
 - `/profile` - User profile page (protected)
+- `/messages` - Direct messages inbox showing all conversations (protected)
+- `/messages/[conversationId]` - Individual chat view with realtime updates (protected)
+- `/search` - User search page to find and follow users (protected)
+- `/u/[id]` - Public user profile page with follow/message buttons (protected)
 - `/profile/edit` - Edit profile page (protected)
 - `/chat` - AI chatbot page (protected, currently disabled)
 
