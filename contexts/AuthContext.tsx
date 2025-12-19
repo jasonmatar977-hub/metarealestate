@@ -76,6 +76,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Check for existing session on mount
   useEffect(() => {
+    console.log('[AuthContext] init');
+    
     if (typeof window === "undefined") {
       setIsLoading(false);
       setLoadingSession(false);
@@ -84,28 +86,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     let isMounted = true; // Prevent state updates if component unmounts
 
-    // Get initial session - do not redirect until this completes
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // Step 1: Get initial session
+    console.log('[AuthContext] Calling getSession()...');
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
       if (!isMounted) return;
+
+      console.log('[AuthContext] getSession result:', { 
+        hasSession: !!session, 
+        hasUser: !!session?.user,
+        userId: session?.user?.id,
+        error: error?.message 
+      });
+
+      if (error) {
+        console.error('[AuthContext] getSession error:', error);
+        setIsAuthenticated(false);
+        setUser(null);
+        setLoadingSession(false);
+        setIsLoading(false);
+        return;
+      }
 
       if (session?.user) {
         loadUserProfile(session.user).then((userData) => {
           if (!isMounted) return;
           if (userData) {
+            console.log('[AuthContext] User loaded:', userData.id);
             setIsAuthenticated(true);
             setUser(userData);
+          } else {
+            setIsAuthenticated(false);
+            setUser(null);
+          }
+          setLoadingSession(false);
+          setIsLoading(false);
+        }).catch((error) => {
+          console.error('[AuthContext] Error loading user profile:', error);
+          if (isMounted) {
+            setIsAuthenticated(false);
+            setUser(null);
+            setLoadingSession(false);
+            setIsLoading(false);
           }
         });
       } else {
+        console.log('[AuthContext] No session found');
         setIsAuthenticated(false);
         setUser(null);
+        setLoadingSession(false);
+        setIsLoading(false);
       }
-      
-      // Mark initial session check as complete
-      setLoadingSession(false);
-      setIsLoading(false);
     }).catch((error) => {
-      console.error("Error getting session:", error);
+      console.error("[AuthContext] Error getting session:", error);
       if (isMounted) {
         setLoadingSession(false);
         setIsLoading(false);
@@ -114,26 +146,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    // Listen for auth changes (after initial session check)
+    // Step 2: Listen for auth changes
+    console.log('[AuthContext] Setting up onAuthStateChange listener...');
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!isMounted) return;
 
+      console.log('[AuthContext] onAuthStateChange event:', event, {
+        hasSession: !!session,
+        userId: session?.user?.id
+      });
+
       if (session?.user) {
         const userData = await loadUserProfile(session.user);
         if (userData) {
+          console.log('[AuthContext] User id:', userData.id);
           setIsAuthenticated(true);
           setUser(userData);
+        } else {
+          setIsAuthenticated(false);
+          setUser(null);
         }
       } else {
+        console.log('[AuthContext] Session cleared');
         setIsAuthenticated(false);
         setUser(null);
       }
+      // Always set loading to false after auth state change
+      setLoadingSession(false);
       setIsLoading(false);
     });
 
     return () => {
+      console.log('[AuthContext] Cleaning up...');
       isMounted = false;
       subscription.unsubscribe();
     };
@@ -144,28 +190,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    */
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
+      console.log('[AuthContext] login() called');
+      setIsLoading(true);
+      
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) {
-        console.error('Login error:', error);
+        console.error('[AuthContext] Login error:', error);
+        setIsLoading(false);
         return false;
       }
 
       if (data.user) {
+        console.log('[AuthContext] Login successful, loading profile...');
         const userData = await loadUserProfile(data.user);
         if (userData) {
+          console.log('[AuthContext] Profile loaded, setting user state');
           setIsAuthenticated(true);
           setUser(userData);
+          setIsLoading(false);
           return true;
+        } else {
+          console.error('[AuthContext] Failed to load user profile');
+          setIsLoading(false);
+          return false;
         }
       }
 
+      setIsLoading(false);
       return false;
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('[AuthContext] Login exception:', error);
+      setIsLoading(false);
       return false;
     }
   };
