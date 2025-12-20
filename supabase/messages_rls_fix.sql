@@ -10,19 +10,44 @@
 
 DROP POLICY IF EXISTS "Users can view conversations they participate in" ON public.conversations;
 DROP POLICY IF EXISTS "Users can create conversations" ON public.conversations;
+DROP POLICY IF EXISTS "Users can update conversations" ON public.conversations;
 
 DROP POLICY IF EXISTS "Users can view participants in their conversations" ON public.conversation_participants;
+DROP POLICY IF EXISTS "Users can view participants" ON public.conversation_participants;
 DROP POLICY IF EXISTS "Users can add themselves to conversations" ON public.conversation_participants;
+DROP POLICY IF EXISTS "Users can insert participants" ON public.conversation_participants;
 
 DROP POLICY IF EXISTS "Users can view messages in their conversations" ON public.messages;
 DROP POLICY IF EXISTS "Users can send messages in their conversations" ON public.messages;
+DROP POLICY IF EXISTS "Users can insert messages" ON public.messages;
 
 -- ============================================
--- Step 2: Fix Conversations Table Policies
+-- Step 2: Fix Conversation Participants Policies (CRITICAL - NO SELF-REFERENCE)
+-- ============================================
+
+-- Policy: Users can SELECT conversation_participants rows where user_id = auth.uid()
+-- This is simple and doesn't query the table itself - NO RECURSION
+CREATE POLICY "Users can view their own participant records"
+  ON public.conversation_participants
+  FOR SELECT
+  TO authenticated
+  USING (user_id = auth.uid());
+
+-- Policy: Users can INSERT conversation_participants only if user_id = auth.uid()
+-- Also simple - NO RECURSION
+CREATE POLICY "Users can add themselves to conversations"
+  ON public.conversation_participants
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (user_id = auth.uid());
+
+-- ============================================
+-- Step 3: Fix Conversations Table Policies
 -- ============================================
 
 -- Policy: Users can view conversations where they are a participant
--- Use a direct check without circular dependency
+-- This queries conversation_participants, but that's OK because
+-- conversation_participants policy doesn't query itself - NO RECURSION
 CREATE POLICY "Users can view conversations they participate in"
   ON public.conversations
   FOR SELECT
@@ -43,34 +68,34 @@ CREATE POLICY "Users can create conversations"
   TO authenticated
   WITH CHECK (true);
 
--- ============================================
--- Step 3: Fix Conversation Participants Policies
--- ============================================
-
--- Policy: Users can view participants in conversations they're part of
--- Simplified approach: Allow SELECT for authenticated users
--- Security is enforced by conversations table RLS - users can only see
--- conversations they participate in, so they can only see participants
--- in those conversations. This avoids recursion completely.
-CREATE POLICY "Users can view participants in their conversations"
-  ON public.conversation_participants
-  FOR SELECT
+-- Policy: Users can update conversations (for updated_at timestamp)
+CREATE POLICY "Users can update conversations they participate in"
+  ON public.conversations
+  FOR UPDATE
   TO authenticated
-  USING (true);
-
--- Policy: Users can add themselves to conversations
-CREATE POLICY "Users can add themselves to conversations"
-  ON public.conversation_participants
-  FOR INSERT
-  TO authenticated
-  WITH CHECK (user_id = auth.uid());
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.conversation_participants cp
+      WHERE cp.conversation_id = conversations.id
+      AND cp.user_id = auth.uid()
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM public.conversation_participants cp
+      WHERE cp.conversation_id = conversations.id
+      AND cp.user_id = auth.uid()
+    )
+  );
 
 -- ============================================
 -- Step 4: Fix Messages Table Policies
 -- ============================================
 
--- Policy: Users can view messages in conversations they're part of
--- Check via conversations table to avoid recursion
+-- Policy: Users can view messages only if they are a participant in that conversation
+-- This queries conversation_participants, but that's OK - NO RECURSION
 CREATE POLICY "Users can view messages in their conversations"
   ON public.messages
   FOR SELECT
@@ -78,18 +103,13 @@ CREATE POLICY "Users can view messages in their conversations"
   USING (
     EXISTS (
       SELECT 1
-      FROM public.conversations c
-      WHERE c.id = messages.conversation_id
-      AND EXISTS (
-        SELECT 1
-        FROM public.conversation_participants cp
-        WHERE cp.conversation_id = c.id
-        AND cp.user_id = auth.uid()
-      )
+      FROM public.conversation_participants cp
+      WHERE cp.conversation_id = messages.conversation_id
+      AND cp.user_id = auth.uid()
     )
   );
 
--- Policy: Users can send messages in conversations they're part of
+-- Policy: Users can send messages only if they are a participant in that conversation
 CREATE POLICY "Users can send messages in their conversations"
   ON public.messages
   FOR INSERT
@@ -98,19 +118,22 @@ CREATE POLICY "Users can send messages in their conversations"
     sender_id = auth.uid()
     AND EXISTS (
       SELECT 1
-      FROM public.conversations c
-      WHERE c.id = messages.conversation_id
-      AND EXISTS (
-        SELECT 1
-        FROM public.conversation_participants cp
-        WHERE cp.conversation_id = c.id
-        AND cp.user_id = auth.uid()
-      )
+      FROM public.conversation_participants cp
+      WHERE cp.conversation_id = messages.conversation_id
+      AND cp.user_id = auth.uid()
     )
   );
 
 -- ============================================
--- Step 5: Verify Policies Created
+-- Step 5: Grant Permissions (if not already granted)
+-- ============================================
+
+GRANT SELECT, INSERT, UPDATE ON public.conversations TO authenticated;
+GRANT SELECT, INSERT ON public.conversation_participants TO authenticated;
+GRANT SELECT, INSERT ON public.messages TO authenticated;
+
+-- ============================================
+-- Step 6: Verify Policies Created
 -- ============================================
 
 DO $$
@@ -122,25 +145,32 @@ BEGIN
   WHERE schemaname = 'public'
   AND tablename IN ('conversations', 'conversation_participants', 'messages');
   
-  IF policy_count >= 6 THEN
+  IF policy_count >= 7 THEN
     RAISE NOTICE '✅ All RLS policies created successfully (found % policies)', policy_count;
   ELSE
-    RAISE WARNING '⚠️ Expected 6 policies, found %. Check for errors above.', policy_count;
+    RAISE WARNING '⚠️ Expected at least 7 policies, found %. Check for errors above.', policy_count;
   END IF;
 END $$;
 
 -- ============================================
--- Step 6: Grant Permissions (if not already granted)
+-- Verification Notes
 -- ============================================
-
-GRANT SELECT, INSERT ON public.conversations TO authenticated;
-GRANT SELECT, INSERT ON public.conversation_participants TO authenticated;
-GRANT SELECT, INSERT ON public.messages TO authenticated;
-
--- ============================================
--- Verification Query (run separately to test)
--- ============================================
-
--- Test query to verify policies work (run as authenticated user):
--- SELECT * FROM conversation_participants WHERE user_id = auth.uid();
--- Should return only participants in conversations you're part of
+-- 
+-- After running this script, test with:
+-- 
+-- 1. As authenticated user, try:
+--    SELECT * FROM conversation_participants;
+--    Should return only rows where user_id = auth.uid()
+-- 
+-- 2. Try:
+--    SELECT * FROM conversations;
+--    Should return only conversations where you are a participant
+-- 
+-- 3. Try:
+--    SELECT * FROM messages;
+--    Should return only messages from conversations you participate in
+-- 
+-- If you see "infinite recursion" errors, check:
+-- - Are there any other policies on these tables not dropped?
+-- - Run: SELECT * FROM pg_policies WHERE tablename IN ('conversations', 'conversation_participants', 'messages');
+-- - Drop any extra policies manually

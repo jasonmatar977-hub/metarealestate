@@ -6,7 +6,7 @@
  * Instagram-like user search with follow/unfollow functionality
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
@@ -27,30 +27,131 @@ export default function SearchPage() {
   const { isAuthenticated, user } = useAuth();
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedTerm, setDebouncedTerm] = useState("");
   const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [followingMap, setFollowingMap] = useState<Record<string, boolean>>({});
+  
+  // AbortController ref to cancel requests on unmount
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Load following status for current user
   useEffect(() => {
     if (isAuthenticated && user) {
       loadFollowingStatus();
     }
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, user?.id]); // Only depend on user.id, not entire user object
 
-  // Search users when query changes (debounced)
+  // Debounce search term (300ms)
   useEffect(() => {
-    if (!searchQuery.trim()) {
+    const timer = setTimeout(() => {
+      setDebouncedTerm(searchQuery);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Search users when debouncedTerm changes (only if length >= 2)
+  useEffect(() => {
+    console.log("[Search] term:", debouncedTerm, "len:", debouncedTerm.length);
+    
+    // Early return if term is too short - immediately clear results and stop loading
+    if (!debouncedTerm || debouncedTerm.trim().length < 2) {
       setSearchResults([]);
+      setIsSearching(false);
       return;
     }
 
-    const debounceTimer = setTimeout(() => {
-      searchUsers(searchQuery);
-    }, 300);
+    // Track if component is still mounted
+    let isMounted = true;
+    
+    // Cancel any pending request (mark as cancelled)
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    // Create new AbortController for this request (for tracking cancellation)
+    abortControllerRef.current = new AbortController();
+    const abortSignal = abortControllerRef.current.signal;
 
-    return () => clearTimeout(debounceTimer);
-  }, [searchQuery]);
+    // Perform search
+    const performSearch = async () => {
+      try {
+        // Check if component is still mounted before setting loading
+        if (!isMounted || abortSignal.aborted) return;
+        setIsSearching(true);
+        
+        const searchLower = debouncedTerm.toLowerCase().trim();
+
+        // Search profiles by display_name (case-insensitive)
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("id, display_name, avatar_url, bio")
+          .ilike("display_name", `%${searchLower}%`)
+          .limit(20);
+
+        // Check if request was cancelled or component unmounted
+        if (abortSignal.aborted || !isMounted) {
+          console.log("[Search] Request cancelled or component unmounted");
+          return;
+        }
+
+        if (error) {
+          console.error("Error searching users:", error);
+          if (isMounted) {
+            setSearchResults([]);
+          }
+          return;
+        }
+
+        console.log("[Search] fetched:", data?.length ?? 0);
+
+        // Check again before setting state
+        if (!isMounted || abortSignal.aborted) return;
+
+        // Get current followingMap and user (capture at time of setting results)
+        // Note: followingMap and user are not in deps to prevent loops, but we capture them here
+        setSearchResults((prevResults) => {
+          // Use the latest followingMap from closure
+          const currentFollowingMap = followingMap;
+          const currentUser = user;
+          
+          // Filter out current user and map following status
+          return (data || [])
+            .filter((profile) => profile.id !== currentUser?.id)
+            .map((profile) => ({
+              ...profile,
+              isFollowing: currentFollowingMap[profile.id] || false,
+            }));
+        });
+      } catch (error: any) {
+        // Ignore abort errors
+        if (error?.name === 'AbortError' || abortSignal.aborted || !isMounted) {
+          console.log("[Search] Request cancelled");
+          return;
+        }
+        console.error("Error in searchUsers:", error);
+        if (isMounted && !abortSignal.aborted) {
+          setSearchResults([]);
+        }
+      } finally {
+        // Only update loading state if component is still mounted and not aborted
+        if (isMounted && !abortSignal.aborted) {
+          setIsSearching(false);
+        }
+      }
+    };
+
+    performSearch();
+
+    // Cleanup: mark as unmounted and abort request
+    return () => {
+      isMounted = false;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, [debouncedTerm]); // ONLY depend on debouncedTerm
 
   const loadFollowingStatus = async () => {
     if (!user) return;
@@ -88,45 +189,7 @@ export default function SearchPage() {
     }
   };
 
-  const searchUsers = async (query: string) => {
-    if (!query.trim()) {
-      setSearchResults([]);
-      return;
-    }
-
-    try {
-      setIsSearching(true);
-      const searchLower = query.toLowerCase().trim();
-
-      // Search profiles by display_name (case-insensitive)
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, display_name, avatar_url, bio")
-        .ilike("display_name", `%${searchLower}%`)
-        .limit(20);
-
-      if (error) {
-        console.error("Error searching users:", error);
-        setSearchResults([]);
-        return;
-      }
-
-      // Filter out current user and map following status
-      const results = (data || [])
-        .filter((profile) => profile.id !== user?.id)
-        .map((profile) => ({
-          ...profile,
-          isFollowing: followingMap[profile.id] || false,
-        }));
-
-      setSearchResults(results);
-    } catch (error) {
-      console.error("Error in searchUsers:", error);
-      setSearchResults([]);
-    } finally {
-      setIsSearching(false);
-    }
-  };
+  // Note: searchUsers function removed - search logic moved into useEffect
 
   const handleFollowToggle = async (targetUserId: string, currentlyFollowing: boolean) => {
     if (!user || !isAuthenticated) {
@@ -175,7 +238,13 @@ export default function SearchPage() {
       console.error("Error toggling follow:", error);
       // Revert optimistic update on error
       await loadFollowingStatus();
-      await searchUsers(searchQuery);
+      // Refresh following status in results (don't trigger new search)
+      setSearchResults((prev) =>
+        prev.map((profile) => ({
+          ...profile,
+          isFollowing: followingMap[profile.id] || false,
+        }))
+      );
     }
   };
 
@@ -228,7 +297,7 @@ export default function SearchPage() {
           </div>
 
           {/* Search Results */}
-          {searchQuery.trim() && (
+          {debouncedTerm.trim().length >= 2 && (
             <div className="space-y-3">
               {isSearching ? (
                 <div className="text-center py-12">
@@ -305,8 +374,8 @@ export default function SearchPage() {
             </div>
           )}
 
-          {/* Empty State - No Search Query */}
-          {!searchQuery.trim() && (
+          {/* Empty State - No Search Query or too short */}
+          {(!searchQuery.trim() || debouncedTerm.trim().length < 2) && (
             <div className="glass-dark rounded-2xl p-12 text-center">
               <svg
                 className="w-16 h-16 text-gray-400 mx-auto mb-4"
@@ -319,7 +388,11 @@ export default function SearchPage() {
               >
                 <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
-              <p className="text-gray-600">Search for users by name</p>
+              <p className="text-gray-600">
+                {searchQuery.trim() && debouncedTerm.trim().length < 2
+                  ? "Type at least 2 characters to search"
+                  : "Type to search for users by name"}
+              </p>
             </div>
           )}
         </div>

@@ -6,7 +6,7 @@
  * Shows messages in a conversation with realtime updates
  */
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
@@ -14,6 +14,7 @@ import Navbar from "@/components/Navbar";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import Link from "next/link";
 import { isValidUrl } from "@/lib/utils";
+import { withTimeout, normalizeSupabaseError, isAuthError } from "@/lib/asyncGuard";
 
 interface Message {
   id: string;
@@ -42,6 +43,9 @@ export default function ChatPage() {
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const hasLoadedRef = useRef(false);
+  const loadingRef = useRef(false);
+  const subscriptionRef = useRef<any>(null);
 
   useEffect(() => {
     if (!loadingSession && !isLoading && !isAuthenticated) {
@@ -49,53 +53,57 @@ export default function ChatPage() {
     }
   }, [isAuthenticated, isLoading, loadingSession, router]);
 
-  useEffect(() => {
-    if (isAuthenticated && user && conversationId) {
-      loadConversationData();
-      setupRealtimeSubscription();
-    }
-
-    return () => {
-      // Cleanup subscription on unmount
-      const channel = supabase.channel(`messages:${conversationId}`);
-      channel.unsubscribe();
-    };
-  }, [isAuthenticated, user, conversationId]);
-
-  // Scroll to bottom when messages change
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const loadConversationData = async () => {
+  const loadConversationData = useCallback(async () => {
     if (!user) return;
+
+    // Set timeout to stop loading after 10 seconds
+    const timeoutId = setTimeout(() => {
+      if (loadingRef.current) {
+        console.error("[Chat] Load conversation data timed out after 10 seconds");
+        setIsLoadingMessages(false);
+        setError("Server error loading messages. Please try again.");
+        loadingRef.current = false;
+      }
+    }, 10000);
 
     try {
       setIsLoadingMessages(true);
       setError(null);
 
       // Step 1: Get conversation participants to find other user
-      const { data: participants, error: participantsError } = await supabase
-        .from("conversation_participants")
-        .select("user_id")
-        .eq("conversation_id", conversationId);
+      const participantsPromise = Promise.resolve(
+        supabase
+          .from("conversation_participants")
+          .select("user_id")
+          .eq("conversation_id", conversationId)
+      ) as Promise<{ data: any; error: any }>;
+      
+      const { data: participants, error: participantsError } = await withTimeout(
+        participantsPromise,
+        10000,
+        'Load participants'
+      );
 
       if (participantsError) {
-        console.error("[Chat] Error loading participants:", {
-          message: participantsError.message,
-          details: participantsError.details,
-          hint: participantsError.hint,
-          code: participantsError.code,
-          status: (participantsError as any).status,
-        });
+        clearTimeout(timeoutId);
+        console.error("[Chat] error:", participantsError, participantsError?.message, participantsError?.details, participantsError?.hint, participantsError?.code);
+        
+        // STOP loading immediately on error
+        setIsLoadingMessages(false);
+        
+        const status = (participantsError as any).status;
+        if (status === 500) {
+          setError("Server error loading messages. Please try again.");
+          return;
+        }
         
         // Check if it's an auth error
         if (participantsError.code === 'PGRST301' || participantsError.code === '42501' || 
-            (participantsError as any).status === 401 || (participantsError as any).status === 403) {
+            status === 401 || status === 403) {
           console.error("[Chat] Auth error - session expired");
           // Force sign out and redirect
           await supabase.auth.signOut();
@@ -104,28 +112,49 @@ export default function ChatPage() {
         }
         
         // For other errors, show error but don't crash
-        setError("You don't have access to this conversation or it doesn't exist");
-        setIsLoadingMessages(false);
+        const normalized = normalizeSupabaseError(participantsError);
+        setError(normalized.message || "You don't have access to this conversation or it doesn't exist");
         return;
       }
 
-      const otherUserId = (participants || []).find((p) => p.user_id !== user.id)?.user_id;
+      const otherUserId = (participants || []).find((p: { user_id: string }) => p.user_id !== user.id)?.user_id;
       if (!otherUserId) {
+        clearTimeout(timeoutId);
         setError("Conversation not found");
         setIsLoadingMessages(false);
         return;
       }
 
       // Step 2: Get other user's profile
-      const { data: otherUserProfile, error: profileError } = await supabase
-        .from("profiles")
-        .select("id, display_name, avatar_url")
-        .eq("id", otherUserId)
-        .single();
+      const profilePromise = Promise.resolve(
+        supabase
+          .from("profiles")
+          .select("id, display_name, avatar_url")
+          .eq("id", otherUserId)
+          .single()
+      ) as Promise<{ data: any; error: any }>;
+      
+      const { data: otherUserProfile, error: profileError } = await withTimeout(
+        profilePromise,
+        10000,
+        'Load profile'
+      );
 
       if (profileError) {
-        console.error("[Chat] Error loading other user profile:", profileError);
-        throw profileError;
+        clearTimeout(timeoutId);
+        console.error("[Chat] error:", profileError, profileError?.message, profileError?.details, profileError?.hint, profileError?.code);
+        
+        // STOP loading immediately on error
+        setIsLoadingMessages(false);
+        
+        const status = (profileError as any).status;
+        const normalized = normalizeSupabaseError(profileError);
+        if (status === 500) {
+          setError("Server error loading messages. Please try again.");
+        } else {
+          setError(normalized.message || "Failed to load user profile. Please try again.");
+        }
+        return;
       }
 
       setOtherUser({
@@ -136,40 +165,73 @@ export default function ChatPage() {
 
       // Step 3: Load messages
       await loadMessages();
+      clearTimeout(timeoutId);
     } catch (error: any) {
+      clearTimeout(timeoutId);
       console.error("[Chat] Error loading conversation data:", error);
-      setError(error?.message || "Failed to load conversation");
+      
+      // STOP loading immediately on error
+      setIsLoadingMessages(false);
+      
+      const status = (error as any)?.status;
+      const normalized = normalizeSupabaseError(error);
+      if (status === 500) {
+        setError("Server error loading messages. Please try again.");
+      } else {
+        setError(normalized.message || "Failed to load conversation. Please try again.");
+      }
     } finally {
+      // ALWAYS clear loading state (in case it wasn't cleared in catch)
       setIsLoadingMessages(false);
     }
-  };
+  }, [user, conversationId, router]);
 
-  const loadMessages = async () => {
+  const loadMessages = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from("messages")
-        .select("id, sender_id, content, created_at")
-        .eq("conversation_id", conversationId)
-        .order("created_at", { ascending: true });
+      const messagePromise = Promise.resolve(
+        supabase
+          .from("messages")
+          .select("id, sender_id, content, created_at")
+          .eq("conversation_id", conversationId)
+          .order("created_at", { ascending: true })
+      ) as Promise<{ data: any; error: any }>;
+      
+      const { data, error } = await withTimeout(
+        messagePromise,
+        10000,
+        'Load messages'
+      );
 
       if (error) {
-        console.error("[Chat] Error loading messages:", {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code,
-        });
-        throw error;
+        console.error("[Chat] error:", error, error?.message, error?.details, error?.hint, error?.code);
+        const status = (error as any).status;
+        const normalized = normalizeSupabaseError(error);
+        if (status === 500) {
+          setError("Server error loading messages. Please try again.");
+        } else {
+          setError(normalized.message || "Failed to load messages. Please try again.");
+        }
+        return;
       }
 
       setMessages(data || []);
     } catch (error: any) {
       console.error("[Chat] Error in loadMessages:", error);
-      setError(error?.message || "Failed to load messages");
+      const status = (error as any)?.status;
+      const normalized = normalizeSupabaseError(error);
+      if (status === 500) {
+        setError("Server error loading messages. Please try again.");
+      } else {
+        setError(normalized.message || "Failed to load messages. Please try again.");
+      }
     }
-  };
+  }, [conversationId]);
 
-  const setupRealtimeSubscription = () => {
+  const setupRealtimeSubscription = useCallback(() => {
+    if (subscriptionRef.current) {
+      subscriptionRef.current.unsubscribe();
+    }
+    
     const channel = supabase
       .channel(`messages:${conversationId}`)
       .on(
@@ -188,10 +250,39 @@ export default function ChatPage() {
       )
       .subscribe();
 
+    subscriptionRef.current = channel;
+  }, [conversationId]);
+
+  // Load conversation data when component mounts or user/conversation changes
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id || !conversationId || loadingRef.current) return;
+    
+    // Prevent double-loading
+    if (hasLoadedRef.current) return;
+    
+    loadingRef.current = true;
+    hasLoadedRef.current = true;
+    
+    loadConversationData().finally(() => {
+      loadingRef.current = false;
+    });
+    
+    setupRealtimeSubscription();
+
     return () => {
-      channel.unsubscribe();
+      // Cleanup subscription on unmount
+      if (subscriptionRef.current) {
+        subscriptionRef.current.unsubscribe();
+        subscriptionRef.current = null;
+      }
+      hasLoadedRef.current = false;
     };
-  };
+  }, [isAuthenticated, user?.id, conversationId, loadConversationData, setupRealtimeSubscription]);
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -201,22 +292,31 @@ export default function ChatPage() {
       setIsSending(true);
       setError(null);
 
-      const { error: insertError } = await supabase
-        .from("messages")
-        .insert({
-          conversation_id: conversationId,
-          sender_id: user.id,
-          content: messageText.trim(),
-        });
+      const insertPromise = Promise.resolve(
+        supabase
+          .from("messages")
+          .insert({
+            conversation_id: conversationId,
+            sender_id: user.id,
+            content: messageText.trim(),
+          })
+      ) as Promise<{ error: any }>;
+      
+      const { error: insertError } = await withTimeout(
+        insertPromise,
+        10000,
+        'Send message'
+      );
 
       if (insertError) {
-        console.error("[Chat] Error sending message:", {
-          message: insertError.message,
-          details: insertError.details,
-          hint: insertError.hint,
-          code: insertError.code,
-        });
-        throw insertError;
+        console.error("[Chat] error:", insertError, insertError?.message, insertError?.details, insertError?.hint, insertError?.code);
+        const status = (insertError as any).status;
+        if (status === 500) {
+          setError("Server error sending message. Please try again.");
+        } else {
+          throw insertError;
+        }
+        return;
       }
 
       setMessageText("");
@@ -324,7 +424,18 @@ export default function ChatPage() {
           <div className="max-w-2xl mx-auto space-y-4">
             {error && (
               <div className="p-4 bg-red-50 border-2 border-red-500 rounded-xl">
-                <p className="text-red-600 text-sm">{error}</p>
+                <p className="text-red-600 text-sm mb-2">{error}</p>
+                <button
+                  onClick={() => {
+                    setError(null);
+                    hasLoadedRef.current = false;
+                    loadingRef.current = false;
+                    loadConversationData();
+                  }}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-semibold transition-colors"
+                >
+                  Retry
+                </button>
               </div>
             )}
 

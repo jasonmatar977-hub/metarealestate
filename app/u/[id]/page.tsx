@@ -6,7 +6,7 @@
  * View any user's public profile with follow/unfollow
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
@@ -16,6 +16,7 @@ import MobileBottomNav from "@/components/MobileBottomNav";
 import Link from "next/link";
 import PostCard from "@/components/PostCard";
 import { isValidUrl } from "@/lib/utils";
+import { requestGuard, normalizeSupabaseError, isAuthError, debugLog, withTimeout } from "@/lib/asyncGuard";
 
 interface Profile {
   id: string;
@@ -44,16 +45,37 @@ export default function PublicProfilePage() {
   const [isTogglingFollow, setIsTogglingFollow] = useState(false);
   const [isStartingChat, setIsStartingChat] = useState(false);
 
+  // Use refs to prevent double-loading in strict mode
+  const hasLoadedRef = useRef<string | null>(null);
+  const loadingRef = useRef(false);
+
   useEffect(() => {
-    if (userId) {
-      loadProfile();
-      loadUserPosts();
-      loadCounts();
-      if (isAuthenticated && user) {
-        checkFollowingStatus();
+    if (!userId || loadingRef.current) return;
+    
+    // Prevent double-loading
+    if (hasLoadedRef.current === userId) return;
+    
+    loadingRef.current = true;
+    hasLoadedRef.current = userId;
+    
+    const loadData = async () => {
+      try {
+        await Promise.all([
+          loadProfile(),
+          loadUserPosts(),
+          loadCounts(),
+        ]);
+        
+        if (isAuthenticated && user) {
+          await checkFollowingStatus();
+        }
+      } finally {
+        loadingRef.current = false;
       }
-    }
-  }, [userId, isAuthenticated, user]);
+    };
+    
+    loadData();
+  }, [userId]); // Remove isAuthenticated and user from deps to prevent loops
 
   const loadProfile = async () => {
     try {
@@ -189,7 +211,7 @@ export default function PublicProfilePage() {
     }
   };
 
-  const handleFollowToggle = async () => {
+  const handleFollowToggle = useCallback(async () => {
     if (!user || !isAuthenticated) {
       router.push("/login");
       return;
@@ -201,62 +223,100 @@ export default function PublicProfilePage() {
       return;
     }
 
-    if (isTogglingFollow) return;
-
-    // Optimistic UI update
-    const previousFollowing = isFollowing;
-    const previousCount = followersCount;
-    
-    setIsFollowing(!isFollowing);
-    setFollowersCount((prev) => (isFollowing ? Math.max(0, prev - 1) : prev + 1));
-    setIsTogglingFollow(true);
+    // Request guard to prevent duplicate requests
+    const requestKey = `follow-${user.id}-${userId}`;
+    if (!requestGuard.start(requestKey)) {
+      debugLog('[Profile] Follow request already in flight, skipping');
+      return;
+    }
 
     try {
+      setIsTogglingFollow(true);
+
+      // Optimistic UI update
+      const previousFollowing = isFollowing;
+      const previousCount = followersCount;
+      
+      setIsFollowing(!isFollowing);
+      setFollowersCount((prev) => (isFollowing ? Math.max(0, prev - 1) : prev + 1));
+
       if (previousFollowing) {
         // Unfollow
-        const { error } = await supabase
-          .from("follows")
-          .delete()
-          .eq("follower_id", user.id)
-          .eq("following_id", userId);
+        const deletePromise = Promise.resolve(
+          supabase
+            .from("follows")
+            .delete()
+            .eq("follower_id", user.id)
+            .eq("following_id", userId)
+        ) as Promise<{ error: any }>;
+        
+        const { error } = await withTimeout(deletePromise, 10000, 'Unfollow');
 
         if (error) {
-          // Revert optimistic update
-          setIsFollowing(previousFollowing);
-          setFollowersCount(previousCount);
-          throw error;
-        }
-      } else {
-        // Follow
-        const { error } = await supabase
-          .from("follows")
-          .insert({
-            follower_id: user.id,
-            following_id: userId,
-          });
-
-        if (error) {
+          const normalized = normalizeSupabaseError(error);
+          debugLog('[Profile] Unfollow error:', normalized);
+          
           // Revert optimistic update
           setIsFollowing(previousFollowing);
           setFollowersCount(previousCount);
           
+          // Check for auth errors
+          if (isAuthError(error)) {
+            alert("Session expired. Please log in again.");
+            router.push("/login");
+            return;
+          }
+          
+          alert(normalized.message || "Failed to unfollow user. Please try again.");
+          return;
+        }
+      } else {
+        // Follow
+        const insertPromise = Promise.resolve(
+          supabase
+            .from("follows")
+            .insert({
+              follower_id: user.id,
+              following_id: userId,
+            })
+        ) as Promise<{ error: any }>;
+        
+        const { error } = await withTimeout(insertPromise, 10000, 'Follow');
+
+        if (error) {
+          const normalized = normalizeSupabaseError(error);
+          debugLog('[Profile] Follow error:', normalized);
+          
+          // Revert optimistic update
+          setIsFollowing(previousFollowing);
+          setFollowersCount(previousCount);
+          
+          // Check for auth errors
+          if (isAuthError(error)) {
+            alert("Session expired. Please log in again.");
+            router.push("/login");
+            return;
+          }
+          
           // Show user-friendly error message
-          if (error.code === '23505') {
+          if (normalized.code === '23505') {
             // Unique constraint violation - already following
             alert("You are already following this user");
-          } else if (error.code === '23514') {
+          } else if (normalized.code === '23514') {
             // Check constraint violation - trying to follow self
             alert("You cannot follow yourself");
           } else {
-            alert(error.message || "Failed to follow user. Please try again.");
+            alert(normalized.message || "Failed to follow user. Please try again.");
           }
-          throw error;
+          return;
         }
       }
       
       // Refetch counts to ensure accuracy
       await loadCounts();
     } catch (error: any) {
+      const normalized = normalizeSupabaseError(error);
+      debugLog('[Profile] Follow toggle exception:', normalized);
       console.error("Error toggling follow:", {
         error,
         message: error?.message,
@@ -268,9 +328,11 @@ export default function PublicProfilePage() {
       await checkFollowingStatus();
       await loadCounts();
     } finally {
+      // ALWAYS clear loading state and finish request guard
       setIsTogglingFollow(false);
+      requestGuard.finish(requestKey);
     }
-  };
+  }, [user, isAuthenticated, userId, isFollowing, followersCount, router, loadCounts, checkFollowingStatus]);
 
   const handleStartChat = async () => {
     if (!user || !isAuthenticated) {

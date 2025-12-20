@@ -125,33 +125,21 @@ export default function LoginForm() {
         return;
       }
 
-      console.log("[LoginForm] Calling login()...");
-      
       // Use AuthContext login function which handles state updates
       const success = await login(formData.email, formData.password);
 
       if (success) {
         // Success - wait a moment for auth state to update, then redirect
-        console.log("[LoginForm] signIn success");
-        setIsSubmitting(false); // Reset before redirect
         // Small delay to ensure auth state is updated
         setTimeout(() => {
           router.push("/feed");
         }, 100);
       } else {
         // Login failed - show error message, DO NOT redirect
-        console.error("[LoginForm] signIn failed");
         setErrors({ submit: "Invalid email or password. Please try again." });
-        setIsSubmitting(false);
         // Do NOT redirect on error - user should be able to retry
       }
     } catch (error: any) {
-      console.error("[LoginForm] signIn exception:", {
-        message: error?.message,
-        name: error?.name,
-        stack: error?.stack,
-      });
-      
       // Handle network/fetch errors
       if (error?.message?.includes('Failed to fetch') || error?.message?.includes('fetch') || error?.name === 'TypeError') {
         setErrors({ submit: "Network error: Cannot connect to Supabase. Please check your .env.local file and restart the dev server." });
@@ -162,11 +150,9 @@ export default function LoginForm() {
         const errorMessage = error?.message || "An error occurred. Please try again.";
         setErrors({ submit: errorMessage });
       }
-      setIsSubmitting(false);
       // Do NOT redirect on error - user should be able to retry
     } finally {
-      // ALWAYS reset submitting state, even if we return early or throw
-      console.log('[LoginForm] setIsSubmitting(false) in finally');
+      // ALWAYS reset submitting state - this is critical to prevent stuck UI
       setIsSubmitting(false);
     }
   };
