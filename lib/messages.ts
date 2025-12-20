@@ -15,6 +15,7 @@ export async function findOrCreateConversation(
 ): Promise<{ conversationId: string; error: any }> {
   try {
     // Step 1: Get all conversations for user1
+    // Use a direct query - RLS will filter automatically
     const { data: user1Convs, error: user1Error } = await supabase
       .from("conversation_participants")
       .select("conversation_id")
@@ -27,6 +28,11 @@ export async function findOrCreateConversation(
         hint: user1Error.hint,
         code: user1Error.code,
       });
+      // If RLS blocks, try creating new conversation
+      if (user1Error.code === 'PGRST301' || user1Error.code === '42501' || user1Error.message?.includes('permission')) {
+        console.log("[messages] RLS blocked query, creating new conversation");
+        return await createNewConversation(userId1, userId2);
+      }
       return { conversationId: "", error: user1Error };
     }
 

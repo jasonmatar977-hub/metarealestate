@@ -91,7 +91,10 @@ export default function ChatPage() {
           hint: participantsError.hint,
           code: participantsError.code,
         });
-        throw participantsError;
+        // If RLS blocks access, show error but don't crash
+        setError("You don't have access to this conversation");
+        setIsLoadingMessages(false);
+        return;
       }
 
       const otherUserId = (participants || []).find((p) => p.user_id !== user.id)?.user_id;
