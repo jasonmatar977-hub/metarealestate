@@ -136,11 +136,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (error) {
         console.error('[AuthContext] getSession error:', error);
+        // Clear any stale session data
+        if (typeof window !== 'undefined') {
+          try {
+            const supabaseKeys = Object.keys(localStorage).filter(key => 
+              key.startsWith('sb-') || key.includes('supabase')
+            );
+            supabaseKeys.forEach(key => {
+              try {
+                localStorage.removeItem(key);
+              } catch (e) {
+                // Ignore
+              }
+            });
+          } catch (e) {
+            // Ignore
+          }
+        }
         setIsAuthenticated(false);
         setUser(null);
         setLoadingSession(false);
         setIsLoading(false);
         return;
+      }
+
+      // If no session, clear any stale data
+      if (!session) {
+        if (typeof window !== 'undefined') {
+          try {
+            const supabaseKeys = Object.keys(localStorage).filter(key => 
+              key.startsWith('sb-') || key.includes('supabase')
+            );
+            supabaseKeys.forEach(key => {
+              try {
+                localStorage.removeItem(key);
+              } catch (e) {
+                // Ignore
+              }
+            });
+          } catch (e) {
+            // Ignore
+          }
+        }
       }
 
       updateUserFromSession(session);
@@ -352,11 +389,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { error } = await supabase.auth.signOut();
       
       if (error) {
-        console.error('Logout error:', error);
+        console.error('[AuthContext] Logout error:', error);
       }
       
-      // Clean up any stale auth keys
+      // Clean up any stale auth keys and cached session data
       cleanupStaleAuthKeys();
+      
+      // Clear any cached session in localStorage/sessionStorage
+      if (typeof window !== 'undefined') {
+        try {
+          // Clear Supabase session storage
+          const supabaseKeys = Object.keys(localStorage).filter(key => 
+            key.startsWith('sb-') || key.includes('supabase')
+          );
+          supabaseKeys.forEach(key => {
+            try {
+              localStorage.removeItem(key);
+            } catch (e) {
+              // Ignore errors
+            }
+          });
+          
+          // Clear sessionStorage too
+          const sessionKeys = Object.keys(sessionStorage).filter(key => 
+            key.startsWith('sb-') || key.includes('supabase')
+          );
+          sessionKeys.forEach(key => {
+            try {
+              sessionStorage.removeItem(key);
+            } catch (e) {
+              // Ignore errors
+            }
+          });
+        } catch (e) {
+          console.warn('[AuthContext] Error clearing storage:', e);
+        }
+      }
       
       // Always clear state regardless of error
       setIsAuthenticated(false);
@@ -369,7 +437,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         window.location.href = '/login';
       }
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error('[AuthContext] Logout exception:', error);
       // Ensure state is cleared even on error
       setIsAuthenticated(false);
       setUser(null);

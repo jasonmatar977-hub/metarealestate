@@ -59,11 +59,51 @@ export default function MessagesPage() {
       setError(null);
 
       // Step 1: Get all conversations where user is a participant
-      // Use a simpler query that works with RLS
+      // Query conversations directly - RLS will filter to only those user participates in
+      const { data: conversationsData, error: conversationsError } = await supabase
+        .from("conversations")
+        .select("id, updated_at")
+        .order("updated_at", { ascending: false })
+        .limit(50);
+
+      if (conversationsError) {
+        console.error("[Messages] Error loading conversations:", {
+          message: conversationsError.message,
+          details: conversationsError.details,
+          hint: conversationsError.hint,
+          code: conversationsError.code,
+          status: (conversationsError as any).status,
+        });
+        
+        // Check if it's an auth error
+        if (conversationsError.code === 'PGRST301' || conversationsError.code === '42501' || 
+            (conversationsError as any).status === 401 || (conversationsError as any).status === 403) {
+          console.error("[Messages] Auth error - session expired");
+          // Force sign out and redirect
+          await supabase.auth.signOut();
+          router.push("/login");
+          return;
+        }
+        
+        // For other errors, show empty state
+        setConversations([]);
+        setIsLoadingConversations(false);
+        return;
+      }
+
+      if (!conversationsData || conversationsData.length === 0) {
+        setConversations([]);
+        setIsLoadingConversations(false);
+        return;
+      }
+
+      const conversationIds = conversationsData.map((c) => c.id);
+
+      // Step 2: Get participants for these conversations
       const { data: participants, error: participantsError } = await supabase
         .from("conversation_participants")
-        .select("conversation_id")
-        .eq("user_id", user.id);
+        .select("conversation_id, user_id")
+        .in("conversation_id", conversationIds);
 
       if (participantsError) {
         console.error("[Messages] Error loading participants:", {
@@ -72,54 +112,16 @@ export default function MessagesPage() {
           hint: participantsError.hint,
           code: participantsError.code,
         });
-        // Don't throw - show empty state instead
-        setConversations([]);
-        setIsLoadingConversations(false);
-        return;
-      }
-
-      if (!participants || participants.length === 0) {
-        setConversations([]);
-        setIsLoadingConversations(false);
-        return;
-      }
-
-      const conversationIds = participants.map((p) => p.conversation_id);
-
-      // Step 2: Get conversations with updated_at
-      const { data: convsData, error: convsError } = await supabase
-        .from("conversations")
-        .select("id, updated_at")
-        .in("id", conversationIds)
-        .order("updated_at", { ascending: false });
-
-      if (convsError) {
-        console.error("[Messages] Error loading conversations:", {
-          message: convsError.message,
-          details: convsError.details,
-          hint: convsError.hint,
-          code: convsError.code,
-        });
-        throw convsError;
+        // Continue with conversations we have, even if participants fail
       }
 
       // Step 3: For each conversation, get the other participant and last message
       const conversationsWithData: Conversation[] = [];
 
-      for (const conv of convsData || []) {
-        // Get all participants for this conversation
-        const { data: convParticipants, error: participantsError2 } = await supabase
-          .from("conversation_participants")
-          .select("user_id")
-          .eq("conversation_id", conv.id);
-
-        if (participantsError2) {
-          console.error("[Messages] Error loading conversation participants:", participantsError2);
-          continue;
-        }
-
-        // Find the other user (not current user)
-        const otherUserId = (convParticipants || []).find((p) => p.user_id !== user.id)?.user_id;
+      for (const conv of conversationsData || []) {
+        // Find the other user from participants we already loaded
+        const convParticipants = (participants || []).filter((p) => p.conversation_id === conv.id);
+        const otherUserId = convParticipants.find((p) => p.user_id !== user.id)?.user_id;
         if (!otherUserId) continue;
 
         // Get other user's profile

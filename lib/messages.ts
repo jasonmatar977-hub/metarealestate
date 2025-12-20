@@ -14,12 +14,11 @@ export async function findOrCreateConversation(
   userId2: string
 ): Promise<{ conversationId: string; error: any }> {
   try {
-    // Step 1: Get all conversations for user1
-    // Use a direct query - RLS will filter automatically
+    // Step 1: Get all conversations for user1 (RLS will filter automatically)
     const { data: user1Convs, error: user1Error } = await supabase
-      .from("conversation_participants")
-      .select("conversation_id")
-      .eq("user_id", userId1);
+      .from("conversations")
+      .select("id")
+      .limit(100);
 
     if (user1Error) {
       console.error("[messages] Error finding user1 conversations:", {
@@ -27,13 +26,18 @@ export async function findOrCreateConversation(
         details: user1Error.details,
         hint: user1Error.hint,
         code: user1Error.code,
+        status: (user1Error as any).status,
       });
-      // If RLS blocks, try creating new conversation
-      if (user1Error.code === 'PGRST301' || user1Error.code === '42501' || user1Error.message?.includes('permission')) {
-        console.log("[messages] RLS blocked query, creating new conversation");
-        return await createNewConversation(userId1, userId2);
+      
+      // If auth error, return error (caller should handle)
+      if (user1Error.code === 'PGRST301' || user1Error.code === '42501' || 
+          (user1Error as any).status === 401 || (user1Error as any).status === 403) {
+        return { conversationId: "", error: user1Error };
       }
-      return { conversationId: "", error: user1Error };
+      
+      // For other errors, try creating new conversation
+      console.log("[messages] Query failed, creating new conversation");
+      return await createNewConversation(userId1, userId2);
     }
 
     if (!user1Convs || user1Convs.length === 0) {
@@ -41,38 +45,50 @@ export async function findOrCreateConversation(
       return await createNewConversation(userId1, userId2);
     }
 
-    const user1ConversationIds = new Set(user1Convs.map((c) => c.conversation_id));
+    const user1ConversationIds = new Set(user1Convs.map((c) => c.id));
 
-    // Step 2: Get all conversations for user2
-    const { data: user2Convs, error: user2Error } = await supabase
+    // Step 2: Check participants for these conversations to find common ones
+    const { data: participants, error: participantsError } = await supabase
       .from("conversation_participants")
-      .select("conversation_id")
-      .eq("user_id", userId2);
+      .select("conversation_id, user_id")
+      .in("conversation_id", Array.from(user1ConversationIds))
+      .in("user_id", [userId1, userId2]);
 
-    if (user2Error) {
-      console.error("[messages] Error finding user2 conversations:", {
-        message: user2Error.message,
-        details: user2Error.details,
-        hint: user2Error.hint,
-        code: user2Error.code,
+    if (participantsError) {
+      console.error("[messages] Error finding participants:", {
+        message: participantsError.message,
+        details: participantsError.details,
+        hint: participantsError.hint,
+        code: participantsError.code,
       });
-      return { conversationId: "", error: user2Error };
+      // Try creating new conversation
+      return await createNewConversation(userId1, userId2);
     }
 
-    // Step 3: Find intersection (conversations both users are in)
-    const commonConversations = (user2Convs || [])
-      .map((c) => c.conversation_id)
-      .filter((id) => user1ConversationIds.has(id));
+    // Step 3: Find conversations where both users are participants
+    const conversationUserCounts = new Map<string, Set<string>>();
+    (participants || []).forEach((p) => {
+      if (!conversationUserCounts.has(p.conversation_id)) {
+        conversationUserCounts.set(p.conversation_id, new Set());
+      }
+      conversationUserCounts.get(p.conversation_id)!.add(p.user_id);
+    });
 
-    if (commonConversations.length > 0) {
-      // Conversation exists, return the first one
-      return { conversationId: commonConversations[0], error: null };
+    // Find conversations with both users
+    for (const [convId, userIds] of conversationUserCounts.entries()) {
+      if (userIds.has(userId1) && userIds.has(userId2)) {
+        return { conversationId: convId, error: null };
+      }
     }
 
     // No common conversation, create new one
     return await createNewConversation(userId1, userId2);
   } catch (error: any) {
-    console.error("[messages] Exception in findOrCreateConversation:", error);
+    console.error("[messages] Exception in findOrCreateConversation:", {
+      message: error?.message,
+      name: error?.name,
+      stack: error?.stack,
+    });
     return { conversationId: "", error };
   }
 }
