@@ -126,3 +126,4 @@ Detects auth-related errors by checking:
 - Not called on successful login
 - Ensures no stale session state remains
 
+

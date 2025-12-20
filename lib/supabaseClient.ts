@@ -10,6 +10,66 @@
 
 import { createClient } from '@supabase/supabase-js';
 
+// In-memory fallback storage for when localStorage is blocked
+const memoryStore = new Map<string, string>();
+
+/**
+ * Custom storage adapter that falls back to memory when localStorage is unavailable
+ * This handles cases where storage is blocked (e.g., WhatsApp in-app browser)
+ */
+function createSafeStorageAdapter() {
+  // Check if localStorage is available
+  let storageAvailable = false;
+  if (typeof window !== 'undefined') {
+    try {
+      const testKey = '__storage_test__';
+      localStorage.setItem(testKey, 'test');
+      localStorage.removeItem(testKey);
+      storageAvailable = true;
+    } catch (e) {
+      storageAvailable = false;
+      console.warn('[Supabase] localStorage is not available, using memory fallback:', e);
+    }
+  }
+
+  return {
+    getItem: (key: string): string | null => {
+      if (storageAvailable) {
+        try {
+          return localStorage.getItem(key);
+        } catch (error) {
+          // Fall back to memory
+          console.warn(`[Supabase] localStorage.getItem failed for "${key}", using memory fallback`);
+          return memoryStore.get(key) ?? null;
+        }
+      }
+      return memoryStore.get(key) ?? null;
+    },
+    setItem: (key: string, value: string): void => {
+      if (storageAvailable) {
+        try {
+          localStorage.setItem(key, value);
+          return;
+        } catch (error) {
+          // Fall back to memory
+          console.warn(`[Supabase] localStorage.setItem failed for "${key}", using memory fallback`);
+        }
+      }
+      memoryStore.set(key, value);
+    },
+    removeItem: (key: string): void => {
+      if (storageAvailable) {
+        try {
+          localStorage.removeItem(key);
+        } catch (error) {
+          console.warn(`[Supabase] localStorage.removeItem failed for "${key}"`);
+        }
+      }
+      memoryStore.delete(key);
+    },
+  };
+}
+
 // Read environment variables directly (NEXT_PUBLIC_ vars are available in both SSR and client)
 // Next.js automatically makes NEXT_PUBLIC_* variables available at build time and runtime
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
@@ -32,10 +92,22 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   });
 }
 
+// Create safe storage adapter
+const safeStorage = createSafeStorageAdapter();
+
 // Create client - use actual values if valid, otherwise use placeholders for build
+// Pass custom storage adapter that falls back to memory when localStorage is blocked
 export const supabase = createClient(
   isValidUrl ? supabaseUrl : 'https://placeholder.supabase.co',
-  isValidKey ? supabaseAnonKey : 'placeholder-key'
+  isValidKey ? supabaseAnonKey : 'placeholder-key',
+  {
+    auth: {
+      persistSession: true,
+      storage: safeStorage,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+  }
 );
 
 // Runtime validation and error logging

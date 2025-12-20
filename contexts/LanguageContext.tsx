@@ -7,8 +7,9 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { safeGet, safeSet } from '@/lib/safeStorage';
 
-type Locale = 'en' | 'ar' | 'zh' | 'de';
+type Locale = 'en' | 'ar' | 'zh' | 'de' | 'fr';
 
 interface LanguageContextType {
   locale: Locale;
@@ -247,24 +248,104 @@ const translations: Record<Locale, Record<string, string>> = {
     'chat.placeholder': 'Geben Sie Ihre Nachricht ein...',
     'chat.send': 'Senden',
   },
+  fr: {
+    'common.login': 'Connexion',
+    'common.logout': 'Déconnexion',
+    'common.createAccount': 'Créer un compte',
+    'common.profile': 'Profil',
+    'common.editProfile': 'Modifier le profil',
+    'common.cancel': 'Annuler',
+    'common.save': 'Enregistrer',
+    'common.loading': 'Chargement...',
+    'common.error': 'Erreur',
+    'common.success': 'Succès',
+    'navbar.about': 'À propos',
+    'navbar.whatWeDo': 'Ce que nous faisons',
+    'navbar.testimonials': 'Témoignages',
+    'navbar.contact': 'Contact',
+    'navbar.listings': 'Annonces',
+    'navbar.feed': 'Fil d\'actualité',
+    'navbar.chat': 'Chat',
+    'navbar.messages': 'Messages',
+    'home.title': 'META REAL ESTATE',
+    'home.subtitle': 'L\'avenir de la découverte immobilière',
+    'home.description': 'Découvrez des propriétés, obtenez des informations et connectez-vous avec des opportunités grâce à une technologie IA de pointe',
+    'listings.title': 'Annonces immobilières',
+    'listings.subtitle': 'Découvrez votre propriété parfaite parmi notre sélection',
+    'feed.title': 'Fil d\'actualité',
+    'feed.subtitle': 'Restez informé des dernières nouvelles de notre communauté',
+    'feed.noPosts': 'Aucun post pour le moment. Soyez le premier à publier !',
+    'feed.whatsOnMind': 'À quoi pensez-vous ?',
+    'feed.post': 'Publier',
+    'feed.posting': 'Publication...',
+    'feed.like': 'J\'aime',
+    'feed.comment': 'Commenter',
+    'feed.share': 'Partager',
+    'feed.addComment': 'Ajouter un commentaire...',
+    'feed.noComments': 'Aucun commentaire pour le moment.',
+    'feed.viewAll': 'Voir tous les commentaires',
+    'feed.showLess': 'Afficher moins',
+    'feed.justNow': 'À l\'instant',
+    'profile.title': 'Profil',
+    'profile.editTitle': 'Modifier le profil',
+    'profile.memberSince': 'Membre depuis',
+    'profile.accountInfo': 'Informations du compte',
+    'profile.displayName': 'Nom d\'affichage',
+    'profile.bio': 'Biographie',
+    'profile.avatarUrl': 'URL de l\'avatar',
+    'profile.location': 'Localisation',
+    'profile.phone': 'Téléphone',
+    'profile.website': 'Site web',
+    'profile.saveChanges': 'Enregistrer les modifications',
+    'profile.saving': 'Enregistrement...',
+    'profile.profileUpdated': 'Profil mis à jour avec succès !',
+    'profile.posts': 'Publications',
+    'profile.followers': 'Abonnés',
+    'profile.following': 'Abonnements',
+    'profile.noPosts': 'Aucune publication pour le moment. Commencez à partager !',
+    'profile.stats': 'Statistiques',
+    'chat.title': 'Chatbot IA',
+    'chat.subtitle': 'Posez-moi n\'importe quelle question sur l\'immobilier',
+    'chat.placeholder': 'Tapez votre message...',
+    'chat.send': 'Envoyer',
+    'messages.comingSoon': 'La fonctionnalité Messages arrive bientôt !',
+    'messages.description': 'Restez à l\'écoute pour la fonctionnalité de messagerie directe.',
+    'auth.forgotPassword': 'Mot de passe oublié ?',
+    'auth.resetPassword': 'Réinitialiser le mot de passe',
+    'auth.resetPasswordDescription': 'Entrez votre adresse e-mail et nous vous enverrons un lien pour réinitialiser votre mot de passe.',
+    'auth.sendResetLink': 'Envoyer le lien de réinitialisation',
+    'auth.setNewPassword': 'Définir un nouveau mot de passe',
+    'auth.newPassword': 'Nouveau mot de passe',
+    'auth.confirmPassword': 'Confirmer le mot de passe',
+    'auth.updatePassword': 'Mettre à jour le mot de passe',
+    'auth.updating': 'Mise à jour...',
+    'auth.passwordUpdated': 'Mot de passe mis à jour avec succès ! Redirection vers la connexion...',
+    'auth.passwordResetSent': 'E-mail de réinitialisation du mot de passe envoyé ! Veuillez vérifier votre boîte de réception et suivre les instructions.',
+    'auth.rememberPassword': 'Vous vous souvenez de votre mot de passe ?',
+    'auth.backToLogin': 'Retour à la connexion',
+    'notifications.title': 'Notifications',
+    'notifications.markAllRead': 'Tout marquer comme lu',
+    'notifications.noNotifications': 'Aucune notification pour le moment',
+    'notifications.viewAll': 'Voir toutes les notifications',
+  },
 };
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>('en');
   const [mounted, setMounted] = useState(false);
 
-  // Load language from localStorage on mount
+  // Load language from storage on mount (safe storage with fallback)
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('locale') as Locale;
-      if (saved && ['en', 'ar', 'zh', 'de'].includes(saved)) {
+      const saved = safeGet('locale') as Locale;
+      if (saved && ['en', 'ar', 'zh', 'de', 'fr'].includes(saved)) {
         setLocaleState(saved);
       }
       setMounted(true);
     }
   }, []);
 
-  // Update document direction for RTL
+  // Update document direction for RTL (only Arabic)
   useEffect(() => {
     if (typeof document !== 'undefined') {
       document.documentElement.dir = locale === 'ar' ? 'rtl' : 'ltr';
@@ -274,9 +355,8 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
 
   const setLocale = (newLocale: Locale) => {
     setLocaleState(newLocale);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('locale', newLocale);
-    }
+    // Use safe storage - will fall back to memory if localStorage is blocked
+    safeSet('locale', newLocale);
   };
 
   const t = (key: string): string => {

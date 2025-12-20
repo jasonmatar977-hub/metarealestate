@@ -14,6 +14,15 @@ interface GlobalErrorProps {
 }
 
 export default function GlobalError({ error, reset }: GlobalErrorProps) {
+  // Detect if running in WhatsApp in-app browser
+  const isWhatsApp = typeof window !== 'undefined' && 
+    /WhatsApp/i.test(navigator.userAgent);
+  
+  // Check if error is storage-related
+  const isStorageError = error.message?.includes('operation is insecure') ||
+    error.message?.includes('SecurityError') ||
+    error.name === 'SecurityError';
+
   useEffect(() => {
     // Log critical error to console
     console.error("=== GLOBAL ERROR (ROOT LEVEL) ===");
@@ -27,9 +36,13 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
       console.error("Error cause:", error.cause);
     }
 
+    if (isStorageError) {
+      console.error("Storage error detected - localStorage may be blocked");
+    }
+
     // In production, send to error tracking service immediately
     // Example: Sentry.captureException(error, { level: 'fatal' });
-  }, [error]);
+  }, [error, isStorageError]);
 
   return (
     <html lang="en">
@@ -70,14 +83,55 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
               )}
             </div>
 
+            {(isWhatsApp || isStorageError) && (
+              <div className="mb-6 p-4 bg-yellow-50 border-2 border-yellow-300 rounded-xl">
+                <p className="text-sm text-yellow-800 font-semibold mb-2">
+                  {isWhatsApp ? '⚠️ Detected: WhatsApp In-App Browser' : '⚠️ Storage Access Issue'}
+                </p>
+                <p className="text-xs text-yellow-700 mb-3">
+                  {isWhatsApp 
+                    ? 'For the best experience, please open this link in Safari or Chrome.'
+                    : 'Your browser has blocked storage access. The app will work but some features may be limited.'}
+                </p>
+                {isWhatsApp && (
+                  <button
+                    onClick={() => {
+                      if (typeof window !== 'undefined') {
+                        const url = window.location.href;
+                        // Try to open in Safari (iOS)
+                        window.location.href = url.replace(/^https?:\/\//, 'x-safari-https://');
+                        // Fallback: show instructions
+                        setTimeout(() => {
+                          alert('Please copy this link and open it in Safari:\n\n' + url);
+                        }, 100);
+                      }
+                    }}
+                    className="w-full px-4 py-2 bg-yellow-500 text-white font-semibold rounded-lg hover:bg-yellow-600 transition-colors text-sm"
+                  >
+                    Open in Safari
+                  </button>
+                )}
+              </div>
+            )}
+
             <div className="flex flex-col gap-4">
               <button
                 onClick={() => {
-                  // Reset the error boundary
-                  reset();
-                  // Also reload the page as a fallback
-                  if (typeof window !== 'undefined') {
-                    window.location.href = '/';
+                  try {
+                    // Reset the error boundary
+                    reset();
+                    // Also reload the page as a fallback
+                    if (typeof window !== 'undefined') {
+                      setTimeout(() => {
+                        window.location.href = '/';
+                      }, 100);
+                    }
+                  } catch (resetError) {
+                    // Prevent crash loop - if reset fails, just reload
+                    console.error("Reset failed, reloading page:", resetError);
+                    if (typeof window !== 'undefined') {
+                      window.location.href = '/';
+                    }
                   }
                 }}
                 className="px-6 py-3 bg-gradient-to-r from-gold to-gold-light text-gray-900 font-bold rounded-xl hover:shadow-lg transition-all"

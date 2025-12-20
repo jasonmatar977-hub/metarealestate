@@ -13,6 +13,7 @@ import { usePathname } from "next/navigation";
 import { useLanguage } from "@/contexts/LanguageContext";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import ProfileDropdown from "@/components/ProfileDropdown";
+import NotificationsBell from "@/components/NotificationsBell";
 
 export default function Navbar() {
   const { isAuthenticated, logout } = useAuth();
@@ -94,6 +95,13 @@ export default function Navbar() {
                 >
                   {t('navbar.chat')}
                 </Link>
+                <Link
+                  href="/messages"
+                  className="px-4 py-2 text-gray-700 hover:text-gold transition-colors font-semibold"
+                >
+                  {t('navbar.messages')}
+                </Link>
+                <NotificationsBell />
                 <LanguageSwitcher />
                 {/* Profile Dropdown - Only avatar icon visible */}
                 <ProfileDropdown />
@@ -220,6 +228,13 @@ export default function Navbar() {
                     className="px-4 py-2 text-gray-700 hover:text-gold hover:bg-gold/10 transition-colors font-semibold rounded-lg"
                   >
                     {t('navbar.chat')}
+                  </Link>
+                  <Link
+                    href="/messages"
+                    onClick={closeMobileMenu}
+                    className="px-4 py-2 text-gray-700 hover:text-gold hover:bg-gold/10 transition-colors font-semibold rounded-lg"
+                  >
+                    {t('navbar.messages')}
                   </Link>
                   <Link
                     href="/profile"

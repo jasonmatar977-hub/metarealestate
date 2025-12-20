@@ -137,14 +137,14 @@ export default function PublicProfilePage() {
         .eq("user_id", userId);
       setPostsCount(postsCount || 0);
 
-      // Followers count
+      // Followers count (users who follow this user)
       const { count: followersCount } = await supabase
         .from("follows")
         .select("*", { count: "exact", head: true })
-        .eq("followed_id", userId);
+        .eq("following_id", userId);
       setFollowersCount(followersCount || 0);
 
-      // Following count
+      // Following count (users this user follows)
       const { count: followingCount } = await supabase
         .from("follows")
         .select("*", { count: "exact", head: true })
@@ -163,7 +163,7 @@ export default function PublicProfilePage() {
         .from("follows")
         .select("id")
         .eq("follower_id", user.id)
-        .eq("followed_id", userId)
+        .eq("following_id", userId)
         .single();
 
       if (error && error.code !== "PGRST116") {
@@ -195,40 +195,76 @@ export default function PublicProfilePage() {
       return;
     }
 
+    // Prevent following yourself
+    if (user.id === userId) {
+      alert("You cannot follow yourself");
+      return;
+    }
+
     if (isTogglingFollow) return;
 
-    try {
-      setIsTogglingFollow(true);
+    // Optimistic UI update
+    const previousFollowing = isFollowing;
+    const previousCount = followersCount;
+    
+    setIsFollowing(!isFollowing);
+    setFollowersCount((prev) => (isFollowing ? Math.max(0, prev - 1) : prev + 1));
+    setIsTogglingFollow(true);
 
-      if (isFollowing) {
+    try {
+      if (previousFollowing) {
         // Unfollow
         const { error } = await supabase
           .from("follows")
           .delete()
           .eq("follower_id", user.id)
-          .eq("followed_id", userId);
+          .eq("following_id", userId);
 
-        if (error) throw error;
-
-        setIsFollowing(false);
-        setFollowersCount((prev) => Math.max(0, prev - 1));
+        if (error) {
+          // Revert optimistic update
+          setIsFollowing(previousFollowing);
+          setFollowersCount(previousCount);
+          throw error;
+        }
       } else {
         // Follow
         const { error } = await supabase
           .from("follows")
           .insert({
             follower_id: user.id,
-            followed_id: userId,
+            following_id: userId,
           });
 
-        if (error) throw error;
-
-        setIsFollowing(true);
-        setFollowersCount((prev) => prev + 1);
+        if (error) {
+          // Revert optimistic update
+          setIsFollowing(previousFollowing);
+          setFollowersCount(previousCount);
+          
+          // Show user-friendly error message
+          if (error.code === '23505') {
+            // Unique constraint violation - already following
+            alert("You are already following this user");
+          } else if (error.code === '23514') {
+            // Check constraint violation - trying to follow self
+            alert("You cannot follow yourself");
+          } else {
+            alert(error.message || "Failed to follow user. Please try again.");
+          }
+          throw error;
+        }
       }
+      
+      // Refetch counts to ensure accuracy
+      await loadCounts();
     } catch (error: any) {
-      console.error("Error toggling follow:", error);
-      // Revert on error
+      console.error("Error toggling follow:", {
+        error,
+        message: error?.message,
+        details: error?.details,
+        hint: error?.hint,
+        code: error?.code,
+      });
+      // Re-check status on error
       await checkFollowingStatus();
       await loadCounts();
     } finally {

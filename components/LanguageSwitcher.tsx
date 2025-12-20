@@ -9,13 +9,14 @@
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useState, useRef, useEffect } from "react";
 
-type Locale = 'en' | 'ar' | 'zh' | 'de';
+type Locale = 'en' | 'ar' | 'zh' | 'de' | 'fr';
 
 const languages: { code: Locale; name: string; flag: string }[] = [
   { code: 'en', name: 'English', flag: '🇺🇸' },
   { code: 'ar', name: 'العربية', flag: '🇸🇦' },
   { code: 'zh', name: '中文', flag: '🇨🇳' },
   { code: 'de', name: 'Deutsch', flag: '🇩🇪' },
+  { code: 'fr', name: 'Français', flag: '🇫🇷' },
 ];
 
 export default function LanguageSwitcher() {
@@ -86,6 +87,7 @@ export default function LanguageSwitcher() {
     </div>
   );
 }
+
 
 
 
