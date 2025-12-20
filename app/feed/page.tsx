@@ -9,7 +9,7 @@
  * All post content is treated as untrusted and rendered safely
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
@@ -235,11 +235,18 @@ export default function FeedPage() {
     }
   }, [isAuthenticated, isLoading, loadingSession, router, hasRedirected]);
 
+  const hasLoadedRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (isAuthenticated && user) {
-      loadPosts(activeTab);
-    }
-  }, [isAuthenticated, user?.id, activeTab]);
+    if (!isAuthenticated || !user) return;
+    
+    // Prevent double-loading for same tab
+    const loadKey = `${user.id}-${activeTab}`;
+    if (hasLoadedRef.current === loadKey) return;
+    
+    hasLoadedRef.current = loadKey;
+    loadPosts(activeTab);
+  }, [isAuthenticated, user?.id, activeTab]); // Only depend on user.id, not entire user object
 
   const loadSuggestedUsers = async () => {
     if (!user) return;
