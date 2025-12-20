@@ -360,15 +360,28 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   };
 
   const t = (key: string): string => {
-    return translations[locale][key] || key;
+    const localeTranslations = translations[locale];
+    if (!localeTranslations) {
+      console.error(`[LanguageContext] Invalid locale: ${locale}, falling back to 'en'`);
+      return translations.en[key] || key;
+    }
+    return localeTranslations[key] || key;
   };
 
   const dir = locale === 'ar' ? 'rtl' : 'ltr';
 
   if (!mounted) {
     // Return default during SSR
+    const ssrT = (key: string): string => {
+      const enTranslations = translations.en;
+      if (!enTranslations) {
+        console.error('[LanguageContext] translations.en is undefined');
+        return key;
+      }
+      return enTranslations[key] || key;
+    };
     return (
-      <LanguageContext.Provider value={{ locale: 'en', setLocale, t: (key) => translations.en[key] || key, dir: 'ltr' }}>
+      <LanguageContext.Provider value={{ locale: 'en', setLocale, t: ssrT, dir: 'ltr' }}>
         {children}
       </LanguageContext.Provider>
     );

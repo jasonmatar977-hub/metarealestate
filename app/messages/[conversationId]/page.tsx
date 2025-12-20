@@ -249,12 +249,23 @@ export default function ChatPage() {
   }, [conversationId]);
 
   const setupRealtimeSubscription = useCallback(() => {
+    if (!conversationId) return;
+    
+    // Clean up existing subscription
     if (subscriptionRef.current) {
+      console.log("[Chat] Unsubscribing from existing channel");
       subscriptionRef.current.unsubscribe();
+      subscriptionRef.current = null;
     }
     
+    console.log("[Chat] Setting up realtime subscription for conversation:", conversationId);
+    
     const channel = supabase
-      .channel(`messages:${conversationId}`)
+      .channel(`messages:${conversationId}`, {
+        config: {
+          broadcast: { self: false },
+        },
+      })
       .on(
         "postgres_changes",
         {
@@ -269,8 +280,11 @@ export default function ChatPage() {
           
           // Normalize: use content as primary, fallback to body
           const normalizedMessage: Message = {
-            ...newMessage,
+            id: newMessage.id,
+            sender_id: newMessage.sender_id,
             content: newMessage.content ?? newMessage.body ?? "",
+            body: newMessage.body,
+            created_at: newMessage.created_at,
           };
           
           // Prevent duplicates: check if message ID already exists
@@ -280,18 +294,32 @@ export default function ChatPage() {
               console.log("[Chat] Message already exists, skipping duplicate:", normalizedMessage.id);
               return prev;
             }
+            console.log("[Chat] Adding new message from realtime:", normalizedMessage.id);
             // Add new message and sort by created_at to maintain order
             const updated = [...prev, normalizedMessage].sort(
               (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
             );
             return updated;
           });
+          
+          // Scroll to bottom when new message arrives
+          setTimeout(() => scrollToBottom(), 100);
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log("[Chat] Realtime subscription status:", status);
+        if (status === "SUBSCRIBED") {
+          console.log("[Chat] ✅ Successfully subscribed to realtime updates");
+        } else if (status === "CHANNEL_ERROR") {
+          console.error("[Chat] ❌ Realtime subscription error");
+        } else if (status === "TIMED_OUT") {
+          console.warn("[Chat] ⚠️ Realtime subscription timed out");
+        } else if (status === "CLOSED") {
+          console.log("[Chat] Realtime subscription closed");
+        }
+      });
 
     subscriptionRef.current = channel;
-    console.log("[Chat] Realtime subscription set up for conversation:", conversationId);
   }, [conversationId]);
 
   // Load conversation data when component mounts or user/conversation changes

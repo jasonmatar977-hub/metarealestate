@@ -10,7 +10,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
-import { findOrCreateConversation } from "@/lib/messages";
+import { findOrCreateDirectConversation } from "@/lib/messages";
 import Navbar from "@/components/Navbar";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import Link from "next/link";
@@ -344,24 +344,36 @@ export default function PublicProfilePage() {
 
     try {
       setIsStartingChat(true);
-      const { conversationId, error } = await findOrCreateConversation(user.id, userId);
+      console.log("[Profile] Starting conversation with user:", userId);
+      
+      const { conversationId, error } = await findOrCreateDirectConversation(user.id, userId);
 
       if (error) {
-        console.error("Error finding/creating conversation:", {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code,
+        console.error("[Profile] ERROR finding/creating conversation:", {
+          error,
+          message: error?.message,
+          details: error?.details,
+          hint: error?.hint,
+          code: error?.code,
+          status: (error as any)?.status,
         });
+        alert(`Failed to start conversation: ${error?.message || "Please try again."}`);
+        return;
+      }
+
+      if (!conversationId) {
+        console.error("[Profile] No conversationId returned");
         alert("Failed to start conversation. Please try again.");
         return;
       }
 
+      console.log("[Profile] Conversation created/found:", conversationId, "Navigating...");
       router.push(`/messages/${conversationId}`);
     } catch (error: any) {
       console.error("Error in handleStartChat:", error);
-      alert("Failed to start conversation. Please try again.");
+      alert(`Failed to start conversation: ${error?.message || "Please try again."}`);
     } finally {
+      // ALWAYS clear loading state to prevent stuck button
       setIsStartingChat(false);
     }
   };

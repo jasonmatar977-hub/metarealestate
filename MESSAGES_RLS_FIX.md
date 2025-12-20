@@ -38,3 +38,5 @@ ALTER TABLE public.conversation_participants DISABLE ROW LEVEL SECURITY;
 
 But the fix above should work and is more secure.
 
+
+

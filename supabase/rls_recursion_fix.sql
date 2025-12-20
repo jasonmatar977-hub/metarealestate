@@ -243,3 +243,5 @@ END $$;
 -- - Run: SELECT * FROM pg_policies WHERE tablename IN ('conversations', 'conversation_participants', 'messages');
 -- - Ensure no policies use EXISTS queries on conversation_participants directly
 
+
+

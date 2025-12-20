@@ -117,9 +117,11 @@ export function debugLog(...args: any[]): void {
 /**
  * Request guard to prevent duplicate requests
  * Returns true if request should proceed, false if already in flight
+ * Includes timeout safety to auto-release stuck requests after 10 seconds
  */
 export class RequestGuard {
   private inFlight = new Set<string>();
+  private timeouts = new Map<string, ReturnType<typeof setTimeout>>();
 
   /**
    * Check if a request is already in flight
@@ -130,30 +132,58 @@ export class RequestGuard {
 
   /**
    * Start a request (returns true if started, false if already in flight)
+   * Auto-releases after 10 seconds as a safety mechanism
    */
   start(key: string): boolean {
     if (this.inFlight.has(key)) {
-      debugLog(`Request ${key} already in flight, skipping`);
+      console.log(`[RequestGuard] Request ${key} already in flight, skipping`);
       return false;
     }
     this.inFlight.add(key);
-    debugLog(`Request ${key} started`);
+    console.log(`[RequestGuard] Request ${key} started`);
+    
+    // Safety timeout: auto-release after 10 seconds
+    const timeoutId = setTimeout(() => {
+      if (this.inFlight.has(key)) {
+        console.warn(`[RequestGuard] Request ${key} timed out after 10s, auto-releasing`);
+        this.finish(key);
+      }
+    }, 10000);
+    
+    this.timeouts.set(key, timeoutId);
     return true;
   }
 
   /**
    * Finish a request
+   * Clears the timeout and removes from in-flight set
    */
   finish(key: string): void {
-    this.inFlight.delete(key);
-    debugLog(`Request ${key} finished`);
+    // Clear timeout if exists
+    const timeoutId = this.timeouts.get(key);
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      this.timeouts.delete(key);
+    }
+    
+    // Remove from in-flight set
+    const wasInFlight = this.inFlight.delete(key);
+    if (wasInFlight) {
+      console.log(`[RequestGuard] Request ${key} finished`);
+    } else {
+      console.warn(`[RequestGuard] Request ${key} finished but was not in flight`);
+    }
   }
 
   /**
    * Clear all in-flight requests (use with caution)
    */
   clear(): void {
+    // Clear all timeouts
+    this.timeouts.forEach((timeoutId) => clearTimeout(timeoutId));
+    this.timeouts.clear();
     this.inFlight.clear();
+    console.log(`[RequestGuard] Cleared all requests`);
   }
 }
 
