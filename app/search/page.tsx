@@ -58,7 +58,7 @@ export default function SearchPage() {
     try {
       const { data, error } = await supabase
         .from("follows")
-        .select("followed_id")
+        .select("following_id")
         .eq("follower_id", user.id);
 
       if (error) {
@@ -74,7 +74,7 @@ export default function SearchPage() {
 
       const following: Record<string, boolean> = {};
       (data || []).forEach((follow) => {
-        following[follow.followed_id] = true;
+        following[follow.following_id] = true;
       });
       setFollowingMap(following);
     } catch (error: any) {
@@ -141,7 +141,7 @@ export default function SearchPage() {
           .from("follows")
           .delete()
           .eq("follower_id", user.id)
-          .eq("followed_id", targetUserId);
+          .eq("following_id", targetUserId);
 
         if (error) throw error;
 
@@ -158,7 +158,7 @@ export default function SearchPage() {
           .from("follows")
           .insert({
             follower_id: user.id,
-            followed_id: targetUserId,
+            following_id: targetUserId,
           });
 
         if (error) throw error;

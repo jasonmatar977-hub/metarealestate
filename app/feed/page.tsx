@@ -81,13 +81,13 @@ export default function FeedPage() {
         }
         const { data: followsData, error: followsError } = await supabase
           .from("follows")
-          .select("followed_id")
+          .select("following_id")
           .eq("follower_id", user.id);
 
         if (followsError) {
           console.error("Error loading follows:", followsError);
         } else {
-          followedUserIds = (followsData || []).map((f) => f.followed_id);
+          followedUserIds = (followsData || []).map((f) => f.following_id);
           if (followedUserIds.length === 0) {
             // No follows, load suggested users
             loadSuggestedUsers();

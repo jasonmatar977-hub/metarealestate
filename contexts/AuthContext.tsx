@@ -10,6 +10,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
+import { safeGetAllKeys, safeRemove } from '@/lib/safeStorage';
 
 interface User {
   id: string;
@@ -74,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Check for existing session on mount
+  // Check for existing session on mount and keep it in sync
   useEffect(() => {
     console.log('[AuthContext] init');
     
@@ -86,7 +87,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     let isMounted = true; // Prevent state updates if component unmounts
 
-    // Step 1: Get initial session
+    // Helper function to update user state from session
+    const updateUserFromSession = async (session: any) => {
+      if (!isMounted) return;
+      
+      if (session?.user) {
+        try {
+          const userData = await loadUserProfile(session.user);
+          if (!isMounted) return;
+          
+          if (userData) {
+            console.log('[AuthContext] User loaded:', userData.id);
+            setIsAuthenticated(true);
+            setUser(userData);
+          } else {
+            setIsAuthenticated(false);
+            setUser(null);
+          }
+        } catch (error) {
+          console.error('[AuthContext] Error loading user profile:', error);
+          if (isMounted) {
+            setIsAuthenticated(false);
+            setUser(null);
+          }
+        }
+      } else {
+        setIsAuthenticated(false);
+        setUser(null);
+      }
+      
+      if (isMounted) {
+        setLoadingSession(false);
+        setIsLoading(false);
+      }
+    };
+
+    // Step 1: Get initial session - ALWAYS use getSession() to get current session
     console.log('[AuthContext] Calling getSession()...');
     supabase.auth.getSession().then(({ data: { session }, error }) => {
       if (!isMounted) return;
@@ -107,35 +143,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      if (session?.user) {
-        loadUserProfile(session.user).then((userData) => {
-          if (!isMounted) return;
-          if (userData) {
-            console.log('[AuthContext] User loaded:', userData.id);
-            setIsAuthenticated(true);
-            setUser(userData);
-          } else {
-            setIsAuthenticated(false);
-            setUser(null);
-          }
-          setLoadingSession(false);
-          setIsLoading(false);
-        }).catch((error) => {
-          console.error('[AuthContext] Error loading user profile:', error);
-          if (isMounted) {
-            setIsAuthenticated(false);
-            setUser(null);
-            setLoadingSession(false);
-            setIsLoading(false);
-          }
-        });
-      } else {
-        console.log('[AuthContext] No session found');
-        setIsAuthenticated(false);
-        setUser(null);
-        setLoadingSession(false);
-        setIsLoading(false);
-      }
+      updateUserFromSession(session);
     }).catch((error) => {
       console.error("[AuthContext] Error getting session:", error);
       if (isMounted) {
@@ -146,7 +154,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    // Step 2: Listen for auth changes
+    // Step 2: Listen for auth changes - this keeps state in sync
     console.log('[AuthContext] Setting up onAuthStateChange listener...');
     const {
       data: { subscription },
@@ -158,24 +166,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         userId: session?.user?.id
       });
 
-      if (session?.user) {
-        const userData = await loadUserProfile(session.user);
-        if (userData) {
-          console.log('[AuthContext] User id:', userData.id);
-          setIsAuthenticated(true);
-          setUser(userData);
-        } else {
-          setIsAuthenticated(false);
-          setUser(null);
-        }
-      } else {
-        console.log('[AuthContext] Session cleared');
+      // Always refresh session from getSession() to ensure we have the latest
+      // This prevents stale session issues
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        await updateUserFromSession(currentSession);
+      } else if (event === 'SIGNED_OUT') {
         setIsAuthenticated(false);
         setUser(null);
+        setLoadingSession(false);
+        setIsLoading(false);
+      } else {
+        // For other events, use the session from the callback
+        await updateUserFromSession(session);
       }
-      // Always set loading to false after auth state change
-      setLoadingSession(false);
-      setIsLoading(false);
     });
 
     return () => {
@@ -186,28 +190,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   /**
-   * Clean up stale auth keys from localStorage
+   * Clean up stale auth keys from storage (safe storage with fallback)
    * Only removes keys starting with 'sb-' and 'supabase.auth.token'
    */
   const cleanupStaleAuthKeys = () => {
     if (typeof window === 'undefined') return;
     
     try {
-      console.log('[AuthContext] Cleaning up stale auth keys from localStorage...');
-      const keysToRemove: string[] = [];
+      console.log('[AuthContext] Cleaning up stale auth keys from storage...');
+      const allKeys = safeGetAllKeys();
+      const keysToRemove = allKeys.filter(
+        key => key.startsWith('sb-') || key.includes('supabase.auth.token')
+      );
       
-      // Find all keys starting with 'sb-' or containing 'supabase.auth.token'
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && (key.startsWith('sb-') || key.includes('supabase.auth.token'))) {
-          keysToRemove.push(key);
-        }
-      }
-      
-      // Remove the keys
+      // Remove the keys using safe storage
       keysToRemove.forEach(key => {
-        localStorage.removeItem(key);
-        console.log(`[AuthContext] Removed localStorage key: ${key}`);
+        safeRemove(key);
+        console.log(`[AuthContext] Removed storage key: ${key}`);
       });
       
       if (keysToRemove.length > 0) {
@@ -216,17 +215,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.log('[AuthContext] No stale auth keys found');
       }
     } catch (error) {
-      console.error('[AuthContext] Error cleaning up localStorage:', error);
+      console.error('[AuthContext] Error cleaning up storage:', error);
     }
   };
 
   /**
    * Login with email and password using Supabase
+   * Always uses getSession() after signIn to ensure we have the latest session
    */
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
       console.log('[AuthContext] signIn start');
       setIsLoading(true);
+      
+      // Clear any stale state first
+      setIsAuthenticated(false);
+      setUser(null);
       
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -240,62 +244,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           status: (error as any).status,
         });
         
-        // Check if it's an auth-related error (invalid credentials, etc.)
-        const isAuthError = error.name === 'AuthApiError' || 
-                           error.message?.toLowerCase().includes('invalid') ||
-                           error.message?.toLowerCase().includes('credentials') ||
-                           error.message?.toLowerCase().includes('email') ||
-                           error.message?.toLowerCase().includes('password');
-        
-        if (isAuthError) {
-          console.log('[AuthContext] Auth error detected, cleaning up stale state...');
-          // Sign out to clear any stale session
-          await supabase.auth.signOut();
-          console.log('[AuthContext] signOut cleanup executed');
-          // Clean up localStorage keys
-          cleanupStaleAuthKeys();
-        }
-        
+        // Always clear state on error
+        setIsAuthenticated(false);
+        setUser(null);
         setIsLoading(false);
         return false;
       }
 
-      if (data.user) {
-        console.log('[AuthContext] signIn success');
-        const userData = await loadUserProfile(data.user);
-        if (userData) {
-          console.log('[AuthContext] Profile loaded, setting user state');
-          setIsAuthenticated(true);
-          setUser(userData);
-          setIsLoading(false);
-          return true;
-        } else {
-          console.error('[AuthContext] Failed to load user profile');
-          setIsLoading(false);
-          return false;
-        }
+      // After successful signIn, always get the current session
+      // This ensures we have the latest session data
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session?.user) {
+        console.error('[AuthContext] Error getting session after signIn:', sessionError);
+        setIsAuthenticated(false);
+        setUser(null);
+        setIsLoading(false);
+        return false;
       }
 
-      setIsLoading(false);
-      return false;
+      // Load user profile from the session
+      const userData = await loadUserProfile(session.user);
+      if (userData) {
+        console.log('[AuthContext] Profile loaded, setting user state');
+        setIsAuthenticated(true);
+        setUser(userData);
+        setIsLoading(false);
+        return true;
+      } else {
+        console.error('[AuthContext] Failed to load user profile');
+        setIsAuthenticated(false);
+        setUser(null);
+        setIsLoading(false);
+        return false;
+      }
     } catch (error: any) {
       console.error('[AuthContext] Login exception:', {
         message: error?.message,
         name: error?.name,
       });
       
-      // On any exception, try to clean up
-      try {
-        await supabase.auth.signOut();
-        cleanupStaleAuthKeys();
-      } catch (cleanupError) {
-        console.error('[AuthContext] Error during cleanup:', cleanupError);
-      }
-      
+      // Always clear state on exception
+      setIsAuthenticated(false);
+      setUser(null);
       setIsLoading(false);
       return false;
     } finally {
-      // ALWAYS reset loading state, even if we return early
+      // ALWAYS reset loading state
       console.log('[AuthContext] isLoading reset');
       setIsLoading(false);
     }
@@ -343,33 +338,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /**
    * Logout from Supabase
    * Reliably signs out and clears session
+   * Always redirects to /login after logout
    */
   const logout = async (): Promise<void> => {
     try {
-      // Clear state first
+      // Clear state first (optimistic)
       setIsAuthenticated(false);
       setUser(null);
+      setIsLoading(false);
+      setLoadingSession(false);
       
       // Sign out from Supabase
       const { error } = await supabase.auth.signOut();
       
       if (error) {
         console.error('Logout error:', error);
-        // Still clear state even if signOut fails
-        setIsAuthenticated(false);
-        setUser(null);
       }
       
-      // Clear any cached session data
+      // Clean up any stale auth keys
+      cleanupStaleAuthKeys();
+      
+      // Always clear state regardless of error
+      setIsAuthenticated(false);
+      setUser(null);
+      setIsLoading(false);
+      setLoadingSession(false);
+      
+      // Redirect to login page
       if (typeof window !== 'undefined') {
-        // Clear localStorage if needed
-        // Note: Supabase handles session storage automatically
+        window.location.href = '/login';
       }
     } catch (error) {
       console.error('Logout error:', error);
       // Ensure state is cleared even on error
       setIsAuthenticated(false);
       setUser(null);
+      setIsLoading(false);
+      setLoadingSession(false);
+      
+      // Still redirect
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
     }
   };
 

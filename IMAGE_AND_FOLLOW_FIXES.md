@@ -130,3 +130,4 @@ console.error("Error loading following status:", {
 - Error logging follows consistent pattern across all follow status checks
 - RLS policies are safe to re-run (use `DROP POLICY IF EXISTS`)
 
+
