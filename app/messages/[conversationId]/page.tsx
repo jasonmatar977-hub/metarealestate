@@ -90,9 +90,21 @@ export default function ChatPage() {
           details: participantsError.details,
           hint: participantsError.hint,
           code: participantsError.code,
+          status: (participantsError as any).status,
         });
-        // If RLS blocks access, show error but don't crash
-        setError("You don't have access to this conversation");
+        
+        // Check if it's an auth error
+        if (participantsError.code === 'PGRST301' || participantsError.code === '42501' || 
+            (participantsError as any).status === 401 || (participantsError as any).status === 403) {
+          console.error("[Chat] Auth error - session expired");
+          // Force sign out and redirect
+          await supabase.auth.signOut();
+          router.push("/login");
+          return;
+        }
+        
+        // For other errors, show error but don't crash
+        setError("You don't have access to this conversation or it doesn't exist");
         setIsLoadingMessages(false);
         return;
       }

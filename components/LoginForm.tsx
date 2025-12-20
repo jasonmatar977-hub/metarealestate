@@ -140,19 +140,25 @@ export default function LoginForm() {
         }, 100);
       } else {
         // Login failed - show error message, DO NOT redirect
-        console.error("[LoginForm] signIn error message: Invalid email or password");
+        console.error("[LoginForm] signIn failed");
         setErrors({ submit: "Invalid email or password. Please try again." });
         setIsSubmitting(false);
         // Do NOT redirect on error - user should be able to retry
       }
     } catch (error: any) {
-      console.error("[LoginForm] signIn error message:", error?.message || "Unknown error");
+      console.error("[LoginForm] signIn exception:", {
+        message: error?.message,
+        name: error?.name,
+        stack: error?.stack,
+      });
       
       // Handle network/fetch errors
       if (error?.message?.includes('Failed to fetch') || error?.message?.includes('fetch') || error?.name === 'TypeError') {
         setErrors({ submit: "Network error: Cannot connect to Supabase. Please check your .env.local file and restart the dev server." });
+      } else if (error?.message?.includes('Invalid login') || error?.message?.includes('credentials')) {
+        setErrors({ submit: "Invalid email or password. Please try again." });
       } else {
-        // For auth errors, show user-friendly message
+        // For other errors, show user-friendly message
         const errorMessage = error?.message || "An error occurred. Please try again.";
         setErrors({ submit: errorMessage });
       }
@@ -160,7 +166,7 @@ export default function LoginForm() {
       // Do NOT redirect on error - user should be able to retry
     } finally {
       // ALWAYS reset submitting state, even if we return early or throw
-      console.log('[LoginForm] isLoading reset');
+      console.log('[LoginForm] setIsSubmitting(false) in finally');
       setIsSubmitting(false);
     }
   };
