@@ -14,6 +14,7 @@ import Navbar from "@/components/Navbar";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import Link from "next/link";
 import { isValidUrl } from "@/lib/utils";
+import { safeGet, safeSet, safeRemove } from "@/lib/safeStorage";
 
 interface UserProfile {
   id: string;
@@ -31,9 +32,25 @@ export default function SearchPage() {
   const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [followingMap, setFollowingMap] = useState<Record<string, boolean>>({});
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
   
   // AbortController ref to cancel requests on unmount
   const abortControllerRef = useRef<AbortController | null>(null);
+  
+  // Load recent searches from localStorage on mount
+  useEffect(() => {
+    try {
+      const stored = safeGet("search_history");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setRecentSearches(parsed.slice(0, 5)); // Max 5 recent searches
+        }
+      }
+    } catch (error) {
+      console.error("[Search] Error loading search history:", error);
+    }
+  }, []);
 
   // Load following status for current user
   useEffect(() => {
@@ -108,6 +125,30 @@ export default function SearchPage() {
 
         // Check again before setting state
         if (!isMounted || abortSignal.aborted) return;
+
+        // Save to search history (only if we got results or query is meaningful)
+        if (searchLower.length >= 2) {
+          try {
+            const currentHistory = safeGet("search_history");
+            let history: string[] = [];
+            if (currentHistory) {
+              try {
+                history = JSON.parse(currentHistory);
+              } catch (e) {
+                history = [];
+              }
+            }
+            // Remove if already exists, then add to front
+            history = history.filter((q) => q.toLowerCase() !== searchLower);
+            history.unshift(searchLower);
+            // Keep only last 5
+            history = history.slice(0, 5);
+            safeSet("search_history", JSON.stringify(history));
+            setRecentSearches(history);
+          } catch (error) {
+            console.error("[Search] Error saving search history:", error);
+          }
+        }
 
         // Get current followingMap and user (capture at time of setting results)
         // Note: followingMap and user are not in deps to prevent loops, but we capture them here
@@ -376,23 +417,58 @@ export default function SearchPage() {
 
           {/* Empty State - No Search Query or too short */}
           {(!searchQuery.trim() || debouncedTerm.trim().length < 2) && (
-            <div className="glass-dark rounded-2xl p-12 text-center">
-              <svg
-                className="w-16 h-16 text-gray-400 mx-auto mb-4"
-                fill="none"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <p className="text-gray-600">
-                {searchQuery.trim() && debouncedTerm.trim().length < 2
-                  ? "Type at least 2 characters to search"
-                  : "Type to search for users by name"}
-              </p>
+            <div className="space-y-4">
+              <div className="glass-dark rounded-2xl p-12 text-center">
+                <svg
+                  className="w-16 h-16 text-gray-400 mx-auto mb-4"
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <p className="text-gray-600">
+                  {searchQuery.trim() && debouncedTerm.trim().length < 2
+                    ? "Type at least 2 characters to search"
+                    : "Type to search for users by name"}
+                </p>
+              </div>
+
+              {/* Recent Searches */}
+              {recentSearches.length > 0 && (
+                <div className="glass-dark rounded-2xl p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-semibold text-gray-900">Recent Searches</h3>
+                    <button
+                      onClick={() => {
+                        safeRemove("search_history");
+                        setRecentSearches([]);
+                      }}
+                      className="text-sm text-gray-600 hover:text-gray-900 underline"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {recentSearches.map((query, index) => (
+                      <button
+                        key={index}
+                        onClick={() => {
+                          setSearchQuery(query);
+                          // Trigger search immediately by setting debounced term
+                          setDebouncedTerm(query);
+                        }}
+                        className="px-4 py-2 bg-gradient-to-r from-gold to-gold-light text-gray-900 rounded-xl font-medium hover:shadow-lg transition-all text-sm"
+                      >
+                        {query}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -151,9 +151,9 @@ BEGIN
   
   -- Find the other participant (receiver)
   SELECT user_id INTO receiver_id
-  FROM public.conversation_participants
-  WHERE conversation_id = conversation_id
-    AND user_id != sender_id
+  FROM public.conversation_participants cp
+  WHERE cp.conversation_id = conversation_id
+    AND cp.user_id != sender_id
   LIMIT 1;
   
   -- Only create notification if receiver exists
