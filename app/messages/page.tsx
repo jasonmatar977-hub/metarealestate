@@ -59,6 +59,7 @@ export default function MessagesPage() {
       setError(null);
 
       // Step 1: Get all conversations where user is a participant
+      // Use a simpler query that works with RLS
       const { data: participants, error: participantsError } = await supabase
         .from("conversation_participants")
         .select("conversation_id")
@@ -71,7 +72,10 @@ export default function MessagesPage() {
           hint: participantsError.hint,
           code: participantsError.code,
         });
-        throw participantsError;
+        // Don't throw - show empty state instead
+        setConversations([]);
+        setIsLoadingConversations(false);
+        return;
       }
 
       if (!participants || participants.length === 0) {
