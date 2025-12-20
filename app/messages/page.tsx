@@ -210,6 +210,16 @@ export default function MessagesPage() {
         if (messageError && messageError.code !== 'PGRST116') {
           // PGRST116 is "not found" which is OK for conversations with no messages
           console.error("[Messages] error:", messageError, messageError?.message, messageError?.details, messageError?.hint, messageError?.code);
+          
+          // Check if it's a missing column error
+          const errorMessage = messageError?.message?.toLowerCase() || '';
+          const errorDetails = messageError?.details?.toLowerCase() || '';
+          if (errorMessage.includes('column') && errorMessage.includes('does not exist') && 
+              (errorMessage.includes('content') || errorDetails.includes('content'))) {
+            console.error("[Messages] SCHEMA ERROR: messages.content column is missing. Check database schema.");
+            setError("Database schema mismatch: 'content' column is missing. Please check your messages table schema.");
+            return;
+          }
         }
 
         conversationsWithData.push({
@@ -265,8 +275,9 @@ export default function MessagesPage() {
     // Reset hasLoadedRef when user changes
     return () => {
       hasLoadedRef.current = false;
+      loadingRef.current = false;
     };
-  }, [isAuthenticated, user?.id]); // Only depend on user.id - loadConversations is stable
+  }, [isAuthenticated, user?.id, loadConversations]); // Include loadConversations in deps (it's stable via useCallback)
 
   const formatTimestamp = (dateString: string) => {
     const date = new Date(dateString);

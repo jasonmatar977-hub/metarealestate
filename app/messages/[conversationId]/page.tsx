@@ -19,7 +19,8 @@ import { withTimeout, normalizeSupabaseError, isAuthError } from "@/lib/asyncGua
 interface Message {
   id: string;
   sender_id: string;
-  content: string;
+  content: string | null;
+  body: string | null;
   created_at: string;
 }
 
@@ -191,7 +192,7 @@ export default function ChatPage() {
       const messagePromise = Promise.resolve(
         supabase
           .from("messages")
-          .select("id, sender_id, content, created_at")
+          .select("id, sender_id, content, body, created_at")
           .eq("conversation_id", conversationId)
           .order("created_at", { ascending: true })
       ) as Promise<{ data: any; error: any }>;
@@ -206,6 +207,17 @@ export default function ChatPage() {
         console.error("[Chat] error:", error, error?.message, error?.details, error?.hint, error?.code);
         const status = (error as any).status;
         const normalized = normalizeSupabaseError(error);
+        
+        // Check if it's a missing column error
+        const errorMessage = normalized.message?.toLowerCase() || '';
+        const errorDetails = normalized.details?.toLowerCase() || '';
+        if (errorMessage.includes('column') && errorMessage.includes('does not exist') && 
+            (errorMessage.includes('content') || errorDetails.includes('content'))) {
+          setError("Database schema mismatch: 'content' column is missing. Please check your messages table schema.");
+          console.error("[Chat] SCHEMA ERROR: messages.content column is missing. Check database schema.");
+          return;
+        }
+        
         if (status === 500) {
           setError("Server error loading messages. Please try again.");
         } else {
@@ -214,7 +226,13 @@ export default function ChatPage() {
         return;
       }
 
-      setMessages(data || []);
+      // Normalize messages: use content as primary, fallback to body if content is null
+      const normalizedMessages = (data || []).map((msg: any) => ({
+        ...msg,
+        content: msg.content ?? msg.body ?? "",
+      }));
+      setMessages(normalizedMessages);
+      console.log("[Chat] Loaded", normalizedMessages.length, "messages from history");
     } catch (error: any) {
       console.error("[Chat] Error in loadMessages:", error);
       const status = (error as any)?.status;
@@ -224,6 +242,9 @@ export default function ChatPage() {
       } else {
         setError(normalized.message || "Failed to load messages. Please try again.");
       }
+    } finally {
+      // Ensure loading is cleared
+      setIsLoadingMessages(false);
     }
   }, [conversationId]);
 
@@ -243,14 +264,34 @@ export default function ChatPage() {
           filter: `conversation_id=eq.${conversationId}`,
         },
         (payload) => {
-          console.log("[Chat] New message received:", payload);
-          const newMessage = payload.new as Message;
-          setMessages((prev) => [...prev, newMessage]);
+          console.log("[Chat] New message received via realtime:", payload);
+          const newMessage = payload.new as any;
+          
+          // Normalize: use content as primary, fallback to body
+          const normalizedMessage: Message = {
+            ...newMessage,
+            content: newMessage.content ?? newMessage.body ?? "",
+          };
+          
+          // Prevent duplicates: check if message ID already exists
+          setMessages((prev) => {
+            const exists = prev.some((msg) => msg.id === normalizedMessage.id);
+            if (exists) {
+              console.log("[Chat] Message already exists, skipping duplicate:", normalizedMessage.id);
+              return prev;
+            }
+            // Add new message and sort by created_at to maintain order
+            const updated = [...prev, normalizedMessage].sort(
+              (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+            );
+            return updated;
+          });
         }
       )
       .subscribe();
 
     subscriptionRef.current = channel;
+    console.log("[Chat] Realtime subscription set up for conversation:", conversationId);
   }, [conversationId]);
 
   // Load conversation data when component mounts or user/conversation changes
@@ -276,6 +317,7 @@ export default function ChatPage() {
         subscriptionRef.current = null;
       }
       hasLoadedRef.current = false;
+      loadingRef.current = false;
     };
   }, [isAuthenticated, user?.id, conversationId, loadConversationData, setupRealtimeSubscription]);
 
@@ -288,21 +330,40 @@ export default function ChatPage() {
     e.preventDefault();
     if (!messageText.trim() || !user || isSending) return;
 
+    const messageTextToSend = messageText.trim();
+    const tempId = `temp-${Date.now()}-${Math.random()}`; // Temporary ID for optimistic update
+    
+    // Optimistic update: add message immediately to UI
+    const optimisticMessage: Message = {
+      id: tempId,
+      sender_id: user.id,
+      content: messageTextToSend,
+      body: null,
+      created_at: new Date().toISOString(),
+    };
+    
+    setMessages((prev) => [...prev, optimisticMessage]);
+    setMessageText(""); // Clear input immediately
+    scrollToBottom(); // Scroll to show new message
+
     try {
       setIsSending(true);
       setError(null);
 
+      // Insert message and get the inserted row back
       const insertPromise = Promise.resolve(
         supabase
           .from("messages")
           .insert({
             conversation_id: conversationId,
             sender_id: user.id,
-            content: messageText.trim(),
+            content: messageTextToSend,
           })
-      ) as Promise<{ error: any }>;
+          .select()
+          .single()
+      ) as Promise<{ data: any; error: any }>;
       
-      const { error: insertError } = await withTimeout(
+      const { data: insertedMessage, error: insertError } = await withTimeout(
         insertPromise,
         10000,
         'Send message'
@@ -310,18 +371,60 @@ export default function ChatPage() {
 
       if (insertError) {
         console.error("[Chat] error:", insertError, insertError?.message, insertError?.details, insertError?.hint, insertError?.code);
+        
+        // Remove optimistic message on error
+        setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
+        
         const status = (insertError as any).status;
+        const normalized = normalizeSupabaseError(insertError);
+        
+        // Check if it's a missing column error
+        const errorMessage = normalized.message?.toLowerCase() || '';
+        const errorDetails = normalized.details?.toLowerCase() || '';
+        if (errorMessage.includes('column') && errorMessage.includes('does not exist') && 
+            (errorMessage.includes('content') || errorDetails.includes('content'))) {
+          setError("Database schema mismatch: 'content' column is missing. Please check your messages table schema.");
+          console.error("[Chat] SCHEMA ERROR: messages.content column is missing. Check database schema.");
+          return;
+        }
+        
         if (status === 500) {
           setError("Server error sending message. Please try again.");
         } else {
-          throw insertError;
+          setError(normalized.message || "Failed to send message. Please try again.");
         }
         return;
       }
 
-      setMessageText("");
+      // Replace optimistic message with real message from database
+      if (insertedMessage) {
+        const normalizedMessage: Message = {
+          ...insertedMessage,
+          content: insertedMessage.content ?? insertedMessage.body ?? "",
+        };
+        
+        setMessages((prev) => {
+          // Remove optimistic message and add real one
+          const filtered = prev.filter((msg) => msg.id !== tempId);
+          // Check if message already exists (from realtime subscription)
+          const exists = filtered.some((msg) => msg.id === normalizedMessage.id);
+          if (exists) {
+            console.log("[Chat] Message already exists from realtime, skipping duplicate");
+            return filtered;
+          }
+          // Add real message and sort by created_at
+          return [...filtered, normalizedMessage].sort(
+            (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          );
+        });
+        scrollToBottom();
+      }
     } catch (error: any) {
       console.error("[Chat] Error in handleSendMessage:", error);
+      
+      // Remove optimistic message on error
+      setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
+      
       setError(error?.message || "Failed to send message");
     } finally {
       setIsSending(false);
@@ -463,7 +566,7 @@ export default function ChatPage() {
                           : "bg-white/80 text-gray-900 border border-gold/20"
                       }`}
                     >
-                      <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
+                      <p className="text-sm whitespace-pre-wrap break-words">{message.content ?? message.body ?? ""}</p>
                       <p className="text-xs mt-1 opacity-70">{formatTimestamp(message.created_at)}</p>
                     </div>
                   </div>
