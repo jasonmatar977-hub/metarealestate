@@ -167,7 +167,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Step 1: Get initial session - ALWAYS use getSession() to get current session
     debugLog('[AuthContext] Calling getSession()...');
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
+    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
       if (!isMountedRef.current) return;
 
       debugLog('[AuthContext] getSession result:', { 
@@ -182,6 +182,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         debugLog('[AuthContext] getSession error:', normalized);
         
         // Clear any stale session data
+        await supabase.auth.signOut({ scope: 'local' });
         cleanupStaleAuthKeys();
         
         if (isMountedRef.current) {
@@ -196,8 +197,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // If no session, clear any stale data
       if (!session) {
         cleanupStaleAuthKeys();
+        if (isMountedRef.current) {
+          setIsAuthenticated(false);
+          setUser(null);
+          setLoadingSession(false);
+          setIsLoading(false);
+        }
+        return;
       }
 
+      // CRITICAL: Validate session by calling getUser() to ensure it's still valid
+      // This catches expired/invalid tokens that getSession() might still return
+      debugLog('[AuthContext] Validating session with getUser()...');
+      const { data: { user: validatedUser }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !validatedUser) {
+        debugLog('[AuthContext] Session validation failed - getUser() returned error or null:', {
+          error: userError?.message,
+          hasUser: !!validatedUser
+        });
+        
+        // Session is invalid - clear it locally
+        await supabase.auth.signOut({ scope: 'local' });
+        cleanupStaleAuthKeys();
+        
+        if (isMountedRef.current) {
+          setIsAuthenticated(false);
+          setUser(null);
+          setLoadingSession(false);
+          setIsLoading(false);
+        }
+        return;
+      }
+
+      // Session is valid - proceed with updateUserFromSession
+      debugLog('[AuthContext] Session validated successfully');
       updateUserFromSession(session);
     }).catch((error) => {
       const normalized = normalizeSupabaseError(error);
@@ -296,6 +330,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /**
    * Login with email and password using Supabase
    * Always uses getSession() after signIn to ensure we have the latest session
+   * CRITICAL: Clears any stale session before attempting login
    */
   const login = useCallback(async (email: string, password: string): Promise<boolean> => {
     try {
@@ -306,6 +341,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsAuthenticated(false);
       setUser(null);
       
+      // CRITICAL FIX: Clear any existing stale session before attempting login
+      // This prevents "Invalid email or password" errors when a stale session exists
+      debugLog('[AuthContext] Clearing any existing stale session before login...');
+      const { data: { session: existingSession } } = await supabase.auth.getSession();
+      if (existingSession) {
+        debugLog('[AuthContext] Found existing session, clearing it locally before login');
+        await supabase.auth.signOut({ scope: 'local' });
+        cleanupStaleAuthKeys();
+      }
+      
+      // Now attempt login with fresh state
+      debugLog('[AuthContext] Attempting signInWithPassword...');
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -314,6 +361,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) {
         const normalized = normalizeSupabaseError(error);
         debugLog('[AuthContext] signIn error:', normalized);
+        console.error('[AuthContext] Login failed:', {
+          message: error.message,
+          status: error.status,
+          name: error.name,
+          details: error
+        });
         
         // Check if auth error (shouldn't happen on signIn, but just in case)
         if (isAuthError(error)) {
