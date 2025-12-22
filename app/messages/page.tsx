@@ -72,52 +72,117 @@ export default function MessagesPage() {
       setIsLoadingConversations(true);
       setError(null);
 
-      // Step 1: Get all conversations where user is a participant
-      // Query conversations directly - RLS will filter to only those user participates in
-      const queryPromise = Promise.resolve(
+      // Step 1: Get conversation IDs where user is a participant (more efficient)
+      // First get participant records, then fetch conversations
+      // This avoids RLS complexity on conversations table
+      const participantsQueryPromise = Promise.resolve(
+        supabase
+          .from("conversation_participants")
+          .select("conversation_id")
+          .eq("user_id", user.id)
+          .limit(100)
+      ) as Promise<{ data: any; error: any }>;
+      
+      const { data: participantsData, error: participantsQueryError } = await withTimeout(
+        participantsQueryPromise,
+        8000,
+        'Load user participants'
+      );
+
+      if (participantsQueryError) {
+        const normalized = normalizeSupabaseError(participantsQueryError);
+        const status = (participantsQueryError as any).status;
+        
+        console.error("[Messages] Participants query error:", {
+          message: participantsQueryError.message,
+          code: participantsQueryError.code,
+          status: status,
+          details: participantsQueryError.details,
+          hint: participantsQueryError.hint,
+          fullError: participantsQueryError
+        });
+        
+        setIsLoadingConversations(false);
+        setConversations([]);
+        
+        if (isAuthError(participantsQueryError) || status === 401 || status === 403) {
+          setError("Not authorized to load conversations. Please log in again.");
+          await supabase.auth.signOut({ scope: 'local' });
+          router.push("/login?message=Session expired, please log in again.");
+          requestGuard.finish(requestKey);
+          return;
+        }
+        
+        setError(normalized.message || "Failed to load conversations. Please try again.");
+        requestGuard.finish(requestKey);
+        return;
+      }
+
+      if (!participantsData || participantsData.length === 0) {
+        setConversations([]);
+        setIsLoadingConversations(false);
+        requestGuard.finish(requestKey);
+        return;
+      }
+
+      const conversationIds = (participantsData || []).map((p: any) => p.conversation_id);
+
+      // Step 2: Get conversations for these IDs
+      const conversationsQueryPromise = Promise.resolve(
         supabase
           .from("conversations")
           .select("id, updated_at")
+          .in("id", conversationIds)
           .order("updated_at", { ascending: false })
           .limit(50)
       ) as Promise<{ data: any; error: any }>;
       
       const { data: conversationsData, error: conversationsError } = await withTimeout(
-        queryPromise,
-        10000,
+        conversationsQueryPromise,
+        8000,
         'Load conversations'
       );
 
       clearTimeout(timeoutId);
 
       if (conversationsError) {
-        console.error("[Messages] error:", conversationsError, conversationsError?.message, conversationsError?.details, conversationsError?.hint, conversationsError?.code);
+        const normalized = normalizeSupabaseError(conversationsError);
+        const status = (conversationsError as any).status;
+        
+        // Log full error details
+        console.error("[Messages] Conversations query error:", {
+          message: conversationsError.message,
+          code: conversationsError.code,
+          status: status,
+          details: conversationsError.details,
+          hint: conversationsError.hint,
+          fullError: conversationsError
+        });
         
         // STOP loading immediately on any error
         setIsLoadingConversations(false);
         setConversations([]);
         
+        // Check if it's an auth/permission error
+        if (isAuthError(conversationsError) || conversationsError.code === 'PGRST301' || 
+            conversationsError.code === '42501' || status === 401 || status === 403) {
+          console.error("[Messages] Auth/permission error - not authorized");
+          setError("Not authorized to load conversations. Please log in again.");
+          // Force sign out and redirect
+          await supabase.auth.signOut({ scope: 'local' });
+          router.push("/login?message=Session expired, please log in again.");
+          requestGuard.finish(requestKey);
+          return;
+        }
+        
         // Check if it's a 500 error
-        const status = (conversationsError as any).status;
         if (status === 500) {
           setError("Server error loading messages. Please try again.");
           requestGuard.finish(requestKey);
           return;
         }
         
-        // Check if it's an auth error
-        if (conversationsError.code === 'PGRST301' || conversationsError.code === '42501' || 
-            status === 401 || status === 403) {
-          console.error("[Messages] Auth error - session expired");
-          // Force sign out and redirect
-          await supabase.auth.signOut();
-          router.push("/login");
-          requestGuard.finish(requestKey);
-          return;
-        }
-        
-        // For other errors, show error message
-        const normalized = normalizeSupabaseError(conversationsError);
+        // For other errors, show the actual error message
         setError(normalized.message || "Failed to load conversations. Please try again.");
         requestGuard.finish(requestKey);
         return;
@@ -130,97 +195,206 @@ export default function MessagesPage() {
         return;
       }
 
-      const conversationIds = (conversationsData || []).map((c: any) => c.id);
+      if (conversationsError) {
+        const normalized = normalizeSupabaseError(conversationsError);
+        const status = (conversationsError as any).status;
+        
+        console.error("[Messages] Conversations query error:", {
+          message: conversationsError.message,
+          code: conversationsError.code,
+          status: status,
+          details: conversationsError.details,
+          hint: conversationsError.hint,
+          fullError: conversationsError
+        });
+        
+        setIsLoadingConversations(false);
+        setConversations([]);
+        
+        if (isAuthError(conversationsError) || status === 401 || status === 403) {
+          setError("Not authorized to load conversations. Please log in again.");
+          await supabase.auth.signOut({ scope: 'local' });
+          router.push("/login?message=Session expired, please log in again.");
+          requestGuard.finish(requestKey);
+          return;
+        }
+        
+        if (status === 500) {
+          setError("Server error loading messages. Please try again.");
+        } else {
+          setError(normalized.message || "Failed to load conversations. Please try again.");
+        }
+        requestGuard.finish(requestKey);
+        return;
+      }
 
-      // Step 2: Get participants for these conversations
+      if (!conversationsData || conversationsData.length === 0) {
+        setConversations([]);
+        setIsLoadingConversations(false);
+        requestGuard.finish(requestKey);
+        return;
+      }
+
+      const conversationIdsForParticipants = (conversationsData || []).map((c: any) => c.id);
+
+      // Step 3: Get all participants for these conversations (to find other user)
       const participantsPromise = Promise.resolve(
         supabase
           .from("conversation_participants")
           .select("conversation_id, user_id")
-          .in("conversation_id", conversationIds)
+          .in("conversation_id", conversationIdsForParticipants)
       ) as Promise<{ data: any; error: any }>;
       
       const { data: participants, error: participantsError } = await withTimeout(
         participantsPromise,
-        10000,
+        8000,
         'Load participants'
       );
 
       if (participantsError) {
-        console.error("[Messages] error:", participantsError, participantsError?.message, participantsError?.details, participantsError?.hint, participantsError?.code);
+        const normalized = normalizeSupabaseError(participantsError);
+        console.error("[Messages] Participants error:", {
+          message: participantsError.message,
+          code: participantsError.code,
+          status: (participantsError as any).status,
+          details: participantsError.details,
+          hint: participantsError.hint
+        });
+        
         const status = (participantsError as any).status;
         if (status === 500) {
-          // STOP loading immediately on 500 error
           setIsLoadingConversations(false);
           setConversations([]);
           setError("Server error loading messages. Please try again.");
           requestGuard.finish(requestKey);
           return;
         }
+        
         // For non-500 errors, continue with conversations we have (partial data is better than nothing)
         // But still log the error
       }
 
-      // Step 3: For each conversation, get the other participant and last message
+      // Step 4: Batch load profiles and last messages (optimized)
       const conversationsWithData: Conversation[] = [];
-
+      
+      // Extract other user IDs
+      const otherUserIds = new Set<string>();
+      const conversationToOtherUser = new Map<string, string>();
+      
       for (const conv of conversationsData || []) {
-        // Find the other user from participants we already loaded
         const convParticipants = (participants || []).filter((p: { conversation_id: string; user_id: string }) => p.conversation_id === conv.id);
         const otherUserId = convParticipants.find((p: { conversation_id: string; user_id: string }) => p.user_id !== user.id)?.user_id;
-        if (!otherUserId) continue;
+        if (otherUserId) {
+          otherUserIds.add(otherUserId);
+          conversationToOtherUser.set(conv.id, otherUserId);
+        }
+      }
 
-        // Get other user's profile
-        const profilePromise = Promise.resolve(
+      // Batch load all profiles at once
+      const profileIds = Array.from(otherUserIds);
+      let profilesMap = new Map<string, any>();
+      
+      if (profileIds.length > 0) {
+        const profilesPromise = Promise.resolve(
           supabase
             .from("profiles")
             .select("id, display_name, avatar_url")
-            .eq("id", otherUserId)
-            .single()
+            .in("id", profileIds)
         ) as Promise<{ data: any; error: any }>;
         
-        const { data: otherUserProfile, error: profileError } = await withTimeout(
-          profilePromise,
-          10000,
-          'Load profile'
+        const { data: profilesData, error: profilesError } = await withTimeout(
+          profilesPromise,
+          8000,
+          'Load profiles batch'
         );
 
-        if (profileError) {
-          console.error("[Messages] error:", profileError, profileError?.message, profileError?.details, profileError?.hint, profileError?.code);
-          continue;
+        if (profilesError) {
+          console.error("[Messages] error loading profiles:", profilesError, profilesError?.message, profilesError?.details, profilesError?.hint, profilesError?.code);
+          const normalized = normalizeSupabaseError(profilesError);
+          if (isAuthError(profilesError)) {
+            setError("Not authorized to load profiles. Please log in again.");
+            requestGuard.finish(requestKey);
+            return;
+          }
+          setError(normalized.message || "Failed to load user profiles.");
+          requestGuard.finish(requestKey);
+          return;
         }
 
-        // Get last message
-        const messagePromise = Promise.resolve(
+        // Create map for quick lookup
+        (profilesData || []).forEach((profile: any) => {
+          profilesMap.set(profile.id, profile);
+        });
+      }
+
+      // Batch load last messages for all conversations
+      const conversationIdsForMessages = (conversationsData || []).map((c: any) => c.id);
+      let lastMessagesMap = new Map<string, any>();
+      
+      if (conversationIdsForMessages.length > 0) {
+        // Use a window function approach: get the latest message per conversation
+        // Since PostgREST doesn't support window functions directly, we'll fetch all recent messages
+        // and group them in JavaScript (more efficient than N queries)
+        const messagesPromise = Promise.resolve(
           supabase
             .from("messages")
-            .select("content, created_at, sender_id")
-            .eq("conversation_id", conv.id)
+            .select("conversation_id, content, created_at, sender_id")
+            .in("conversation_id", conversationIdsForMessages)
             .order("created_at", { ascending: false })
-            .limit(1)
-            .single()
+            .limit(Math.min(conversationIdsForMessages.length * 2, 100)) // Limit to 100 messages max
         ) as Promise<{ data: any; error: any }>;
         
-        const { data: lastMessageData, error: messageError } = await withTimeout(
-          messagePromise,
-          10000,
-          'Load last message'
+        const { data: messagesData, error: messagesError } = await withTimeout(
+          messagesPromise,
+          8000,
+          'Load messages batch'
         );
-        
-        if (messageError && messageError.code !== 'PGRST116') {
-          // PGRST116 is "not found" which is OK for conversations with no messages
-          console.error("[Messages] error:", messageError, messageError?.message, messageError?.details, messageError?.hint, messageError?.code);
+
+        if (messagesError && messagesError.code !== 'PGRST116') {
+          console.error("[Messages] error loading messages:", messagesError, messagesError?.message, messagesError?.details, messagesError?.hint, messagesError?.code);
           
           // Check if it's a missing column error
-          const errorMessage = messageError?.message?.toLowerCase() || '';
-          const errorDetails = messageError?.details?.toLowerCase() || '';
+          const errorMessage = messagesError?.message?.toLowerCase() || '';
+          const errorDetails = messagesError?.details?.toLowerCase() || '';
           if (errorMessage.includes('column') && errorMessage.includes('does not exist') && 
               (errorMessage.includes('content') || errorDetails.includes('content'))) {
             console.error("[Messages] SCHEMA ERROR: messages.content column is missing. Check database schema.");
             setError("Database schema mismatch: 'content' column is missing. Please check your messages table schema.");
+            requestGuard.finish(requestKey);
             return;
           }
+          
+          if (isAuthError(messagesError)) {
+            setError("Not authorized to load messages. Please log in again.");
+            requestGuard.finish(requestKey);
+            return;
+          }
+          
+          // Non-critical error - continue without last messages
+        } else if (messagesData) {
+          // Group messages by conversation_id, keeping only the latest per conversation
+          const messagesByConv = new Map<string, any>();
+          (messagesData || []).forEach((msg: any) => {
+            if (!messagesByConv.has(msg.conversation_id)) {
+              messagesByConv.set(msg.conversation_id, msg);
+            }
+          });
+          lastMessagesMap = messagesByConv;
         }
+      }
+
+      // Build final conversations array
+      for (const conv of conversationsData || []) {
+        const otherUserId = conversationToOtherUser.get(conv.id);
+        if (!otherUserId) continue;
+
+        const otherUserProfile = profilesMap.get(otherUserId);
+        if (!otherUserProfile) {
+          console.warn("[Messages] Profile not found for user:", otherUserId);
+          continue;
+        }
+
+        const lastMessage = lastMessagesMap.get(conv.id) || null;
 
         conversationsWithData.push({
           id: conv.id,
@@ -230,7 +404,7 @@ export default function MessagesPage() {
             display_name: otherUserProfile.display_name,
             avatar_url: otherUserProfile.avatar_url,
           },
-          lastMessage: lastMessageData || null,
+          lastMessage: lastMessage,
         });
       }
 

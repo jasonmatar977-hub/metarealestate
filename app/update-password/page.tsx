@@ -3,38 +3,120 @@
 /**
  * Update Password Page
  * Route: /update-password
- * User sets new password after clicking reset link
+ * User sets new password after clicking reset link from Supabase email
+ * 
+ * Handles Supabase recovery token from URL hash (#access_token=...)
  */
 
 import { useState, useEffect, Suspense } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import Navbar from "@/components/Navbar";
-import { useLanguage } from "@/contexts/LanguageContext";
 
 function UpdatePasswordForm() {
-  const { t } = useLanguage();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [isValidSession, setIsValidSession] = useState(false);
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
 
   useEffect(() => {
-    // Check if user has a valid session (from reset link)
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        setIsValidSession(true);
-      } else {
+    // Handle password reset recovery token from URL
+    const handleRecovery = async () => {
+      try {
+        setIsCheckingSession(true);
+        
+        // Supabase recovery links come in URL hash: #access_token=...&type=recovery&...
+        // We need to check both the hash and query params
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const queryType = searchParams.get('type');
+        const hashType = hashParams.get('type');
+        const accessToken = hashParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token');
+        
+        console.log('[UpdatePassword] Checking recovery token:', {
+          hasHash: !!window.location.hash,
+          hashType,
+          queryType,
+          hasAccessToken: !!accessToken,
+          hasRefreshToken: !!refreshToken
+        });
+
+        // Check if this is a recovery flow
+        if ((hashType === 'recovery' || queryType === 'recovery') && accessToken) {
+          console.log('[UpdatePassword] Recovery token detected, establishing session...');
+          
+          // Supabase should automatically handle the hash, but we can also manually set the session
+          // First, try to get the current session (Supabase may have already processed the hash)
+          const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+          
+          if (session && session.user) {
+            console.log('[UpdatePassword] Session established from recovery token');
+            setIsValidSession(true);
+            setIsCheckingSession(false);
+            return;
+          }
+          
+          // If no session yet, try to set it manually using the tokens from hash
+          if (accessToken && refreshToken) {
+            console.log('[UpdatePassword] Setting session from recovery tokens...');
+            const { data: { session: newSession }, error: setSessionError } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+            
+            if (setSessionError) {
+              console.error('[UpdatePassword] Error setting session:', setSessionError);
+              setError("Invalid or expired reset link. Please request a new password reset.");
+              setIsCheckingSession(false);
+              return;
+            }
+            
+            if (newSession && newSession.user) {
+              console.log('[UpdatePassword] Session established manually');
+              setIsValidSession(true);
+              setIsCheckingSession(false);
+              return;
+            }
+          }
+          
+          // If we still don't have a session, the token might be invalid
+          setError("Invalid or expired reset link. Please request a new password reset.");
+          setIsCheckingSession(false);
+          return;
+        }
+
+        // Check if we already have a valid session (user might have refreshed the page)
+        const { data: { session: existingSession }, error: existingError } = await supabase.auth.getSession();
+        
+        if (existingSession && existingSession.user) {
+          console.log('[UpdatePassword] Existing session found');
+          setIsValidSession(true);
+          setIsCheckingSession(false);
+          return;
+        }
+
+        // No valid session or recovery token
+        console.error('[UpdatePassword] No valid session or recovery token found');
         setError("Invalid or expired reset link. Please request a new password reset.");
+        setIsCheckingSession(false);
+      } catch (err: any) {
+        console.error('[UpdatePassword] Error checking session:', err);
+        setError("An error occurred. Please request a new password reset.");
+        setIsCheckingSession(false);
       }
     };
-    checkSession();
-  }, []);
+    
+    // Only run on client side
+    if (typeof window !== 'undefined') {
+      handleRecovery();
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,28 +137,39 @@ function UpdatePasswordForm() {
 
     setIsLoading(true);
     try {
+      // Verify we still have a valid session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session || !session.user) {
+        setError("Your session has expired. Please request a new password reset link.");
+        setIsLoading(false);
+        return;
+      }
+
       // Update password using Supabase
       const { error: updateError } = await supabase.auth.updateUser({
         password: password,
       });
 
       if (updateError) {
+        console.error('[UpdatePassword] Error updating password:', updateError);
         setError(updateError.message || "Failed to update password. Please try again.");
       } else {
         setSuccess(true);
-        // Redirect to login after 2 seconds
+        // Redirect to login with success message after 2 seconds
         setTimeout(() => {
-          router.push("/login");
+          router.push("/login?message=Password updated successfully. Please log in with your new password.");
         }, 2000);
       }
     } catch (err: any) {
+      console.error('[UpdatePassword] Exception updating password:', err);
       setError(err.message || "An error occurred. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  if (!isValidSession && !error) {
+  if (isCheckingSession) {
     return (
       <main className="min-h-screen">
         <Navbar />
@@ -157,6 +250,14 @@ function UpdatePasswordForm() {
                 {error && (
                   <div className="bg-red-50 border-2 border-red-500 rounded-xl p-4">
                     <p className="text-red-600 text-sm text-center">{error}</p>
+                    {error.includes("expired") && (
+                      <Link
+                        href="/reset-password"
+                        className="block text-center mt-2 text-red-600 hover:text-red-800 text-sm font-semibold underline"
+                      >
+                        Request a new reset link
+                      </Link>
+                    )}
                   </div>
                 )}
 

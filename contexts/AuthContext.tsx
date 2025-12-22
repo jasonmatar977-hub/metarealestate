@@ -361,11 +361,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) {
         const normalized = normalizeSupabaseError(error);
         debugLog('[AuthContext] signIn error:', normalized);
-        console.error('[AuthContext] Login failed:', {
+        
+        // Log full error details for debugging (dev mode)
+        console.error('[AuthContext] Login failed - Full error details:', {
           message: error.message,
           status: error.status,
           name: error.name,
-          details: error
+          code: (error as any).code,
+          details: (error as any).details,
+          hint: (error as any).hint,
+          fullError: error
         });
         
         // Check if auth error (shouldn't happen on signIn, but just in case)
