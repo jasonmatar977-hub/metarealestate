@@ -12,15 +12,16 @@
  * - Secure session management
  */
 
-import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useRef, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase, getSupabaseConfigError } from "@/lib/supabaseClient";
 import { useAuth } from "@/contexts/AuthContext";
 import { validateEmail, validatePassword, getEmailError, getPasswordError } from "@/lib/validation";
 
-export default function LoginForm() {
+function LoginFormContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { login, isAuthenticated, isLoading: authLoading, loadingSession } = useAuth();
   const [formData, setFormData] = useState({
     email: "",
@@ -39,7 +40,15 @@ export default function LoginForm() {
     setErrors({});
     setCheckingSession(true);
     hasRedirectedRef.current = false;
-  }, []);
+    
+    // Check for message from query params (e.g., "Session expired")
+    const message = searchParams.get('message');
+    if (message) {
+      setErrors({ submit: message });
+      // Clear the message from URL
+      router.replace('/login', { scroll: false });
+    }
+  }, [searchParams, router]);
 
   // Check Supabase configuration on mount
   useEffect(() => {
@@ -249,6 +258,25 @@ export default function LoginForm() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginForm() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center px-4 pt-20 pb-20">
+        <div className="w-full max-w-md">
+          <div className="glass-dark rounded-3xl p-6 sm:p-8 md:p-12 shadow-2xl">
+            <h1 className="font-orbitron text-3xl md:text-4xl font-bold text-center mb-2 text-gold-dark">
+              Welcome Back
+            </h1>
+            <p className="text-center text-gray-600 mb-8">Loading...</p>
+          </div>
+        </div>
+      </div>
+    }>
+      <LoginFormContent />
+    </Suspense>
   );
 }
 

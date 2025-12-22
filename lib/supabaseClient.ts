@@ -107,8 +107,70 @@ export const supabase = createClient(
       autoRefreshToken: true,
       detectSessionInUrl: true,
     },
+    global: {
+      headers: {
+        'x-client-info': 'meta-real-estate@1.0.0',
+      },
+    },
   }
 );
+
+// Global 401 handler: Automatically sign out on invalid token errors
+// This catches expired/invalid sessions from any Supabase request
+if (typeof window !== 'undefined' && isValidUrl && isValidKey) {
+  // Store original fetch to restore if needed
+  const originalFetch = window.fetch;
+  let isHandling401 = false; // Prevent infinite loops
+  
+  // Intercept fetch only for Supabase requests
+  window.fetch = async function(...args) {
+    const response = await originalFetch.apply(this, args);
+    
+    // Check if this is a Supabase request and returned 401
+    const url = args[0]?.toString() || '';
+    const isSupabaseRequest = url.includes('supabase') || 
+                              url.includes(supabaseUrl?.substring(0, 30) || '');
+    
+    if (isSupabaseRequest && response.status === 401 && !isHandling401) {
+      isHandling401 = true;
+      console.warn('[Supabase] 401 Unauthorized detected - session expired');
+      
+      // Sign out locally and clear storage
+      try {
+        await supabase.auth.signOut({ scope: 'local' });
+        
+        // Clear storage keys
+        try {
+          const allKeys = Object.keys(localStorage);
+          allKeys.forEach(key => {
+            if (key.startsWith('sb-') || key.includes('supabase.auth.token')) {
+              localStorage.removeItem(key);
+            }
+          });
+        } catch (e) {
+          console.error('[Supabase] Error clearing storage:', e);
+        }
+        
+        // Redirect to login with message (only if not already on login page)
+        if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
+          const currentUrl = new URL(window.location.href);
+          currentUrl.pathname = '/login';
+          currentUrl.searchParams.set('message', 'Session expired, please log in again.');
+          window.location.href = currentUrl.toString();
+        }
+      } catch (err) {
+        console.error('[Supabase] Error during auto signOut:', err);
+      } finally {
+        // Reset flag after a delay to allow redirect
+        setTimeout(() => {
+          isHandling401 = false;
+        }, 1000);
+      }
+    }
+    
+    return response;
+  };
+}
 
 // Runtime validation and error logging
 if (typeof window !== 'undefined') {
