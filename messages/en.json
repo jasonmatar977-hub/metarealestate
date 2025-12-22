@@ -39,7 +39,15 @@
     "posting": "Posting...",
     "like": "Like",
     "comment": "Comment",
-    "share": "Share"
+    "share": "Share",
+    "addComment": "Add a comment...",
+    "addReply": "Write a reply...",
+    "noComments": "No comments yet.",
+    "viewAll": "View all comments",
+    "showLess": "Show less",
+    "reply": "Reply",
+    "viewReplies": "View replies",
+    "hideReplies": "Hide replies"
   },
   "profile": {
     "title": "Profile",
@@ -54,7 +62,27 @@
     "website": "Website",
     "saveChanges": "Save Changes",
     "saving": "Saving...",
-    "profileUpdated": "Profile updated successfully!"
+    "profileUpdated": "Profile updated successfully!",
+    "showPhonePublicly": "Show my phone number publicly",
+    "phoneHidden": "Hidden",
+    "phoneVisible": "Your phone number will be visible to all users",
+    "followers": "Followers",
+    "following": "Following",
+    "removeFollower": "Remove",
+    "unfollow": "Unfollow",
+    "confirmRemoveFollower": "Are you sure you want to remove this follower? This will block them.",
+    "confirmUnfollow": "Are you sure you want to unfollow this user?",
+    "noFollowers": "No followers yet",
+    "noFollowing": "Not following anyone yet",
+    "blocked": "Blocked",
+    "cannotFollowBlocked": "You cannot follow a user you have blocked.",
+    "online": "Online",
+    "offline": "Offline",
+    "lastSeen": "Last seen {{minutes}} min ago",
+    "noOnlineUsers": "No online users"
+  },
+  "common": {
+    "loading": "Loading..."
   },
   "chat": {
     "title": "AI Chatbot",
