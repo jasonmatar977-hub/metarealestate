@@ -14,6 +14,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
 import Navbar from "@/components/Navbar";
 import Link from "next/link";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface ProfileData {
   display_name: string;
@@ -22,10 +23,12 @@ interface ProfileData {
   location: string;
   phone: string;
   website: string;
+  phone_public: boolean;
 }
 
 export default function EditProfilePage() {
   const { isAuthenticated, isLoading: authLoading, loadingSession, user } = useAuth();
+  const { t } = useLanguage();
   const router = useRouter();
   const [hasRedirected, setHasRedirected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -40,6 +43,7 @@ export default function EditProfilePage() {
     location: '',
     phone: '',
     website: '',
+    phone_public: false,
   });
 
   useEffect(() => {
@@ -74,6 +78,7 @@ export default function EditProfilePage() {
             location: data.location || '',
             phone: data.phone || '',
             website: data.website || '',
+            phone_public: data.phone_public ?? false, // Default to false if null
           });
         } else {
           // Set defaults from user
@@ -84,6 +89,7 @@ export default function EditProfilePage() {
             location: '',
             phone: '',
             website: '',
+            phone_public: false,
           });
         }
       } catch (error) {
@@ -118,6 +124,7 @@ export default function EditProfilePage() {
           location: formData.location.trim() || null,
           phone: formData.phone.trim() || null,
           website: formData.website.trim() || null,
+          phone_public: formData.phone_public,
         }, {
           onConflict: 'id'
         });
@@ -257,6 +264,25 @@ export default function EditProfilePage() {
                 className="w-full px-4 py-3 rounded-xl border-2 border-gold/40 focus:border-gold focus:outline-none"
                 placeholder="+1 234 567 8900"
               />
+              {/* Phone Privacy Toggle */}
+              <div className="mt-3 flex items-center gap-3">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.phone_public}
+                    onChange={(e) => setFormData({ ...formData, phone_public: e.target.checked })}
+                    className="w-5 h-5 rounded border-2 border-gold/40 text-gold focus:ring-gold focus:ring-2"
+                  />
+                  <span className="text-sm text-gray-700 font-medium">
+                    {t('profile.showPhonePublicly') || 'Show my phone number publicly'}
+                  </span>
+                </label>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                {formData.phone_public 
+                  ? (t('profile.phoneVisible') || 'Your phone number will be visible to all users')
+                  : (t('profile.phoneHidden') || 'Your phone number will be hidden from other users')}
+              </p>
             </div>
 
             {/* Website */}

@@ -14,12 +14,14 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import ProfileDropdown from "@/components/ProfileDropdown";
 import NotificationsBell from "@/components/NotificationsBell";
+import { useUnreadMessages } from "@/hooks/useUnreadMessages";
 
 export default function Navbar() {
   const { isAuthenticated, logout } = useAuth();
   const { t } = useLanguage();
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const unreadCount = useUnreadMessages();
 
   const closeMobileMenu = () => {
     setIsMobileMenuOpen(false);
@@ -103,9 +105,14 @@ export default function Navbar() {
                 </Link>
                 <Link
                   href="/messages"
-                  className="px-4 py-2 text-gray-700 hover:text-gold transition-colors font-semibold"
+                  className="px-4 py-2 text-gray-700 hover:text-gold transition-colors font-semibold relative"
                 >
                   {t('navbar.messages')}
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-gold text-gray-900 text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  )}
                 </Link>
                 <NotificationsBell />
                 <LanguageSwitcher />
@@ -245,9 +252,14 @@ export default function Navbar() {
                   <Link
                     href="/messages"
                     onClick={closeMobileMenu}
-                    className="px-4 py-2 text-gray-700 hover:text-gold hover:bg-gold/10 transition-colors font-semibold rounded-lg"
+                    className="px-4 py-2 text-gray-700 hover:text-gold hover:bg-gold/10 transition-colors font-semibold rounded-lg relative"
                   >
                     {t('navbar.messages')}
+                    {unreadCount > 0 && (
+                      <span className="absolute top-1 right-1 bg-gold text-gray-900 text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                      </span>
+                    )}
                   </Link>
                   <Link
                     href="/profile"

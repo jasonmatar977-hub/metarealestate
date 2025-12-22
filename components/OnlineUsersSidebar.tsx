@@ -1,0 +1,413 @@
+"use client";
+
+/**
+ * Online Users Sidebar
+ * Instagram-style right-side sidebar showing online/offline users
+ * Shows users I follow (priority) or recent conversations
+ */
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabaseClient";
+import { findOrCreateDirectConversation } from "@/lib/messages";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { isValidUrl } from "@/lib/utils";
+
+interface UserWithPresence {
+  id: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  last_seen_at: string | null;
+  is_online: boolean;
+}
+
+export default function OnlineUsersSidebar() {
+  const { isAuthenticated, user } = useAuth();
+  const { t } = useLanguage();
+  const router = useRouter();
+  const [users, setUsers] = useState<UserWithPresence[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [blockedUserIds, setBlockedUserIds] = useState<Set<string>>(new Set());
+
+  // Load blocked users
+  useEffect(() => {
+    if (!user || !isAuthenticated) return;
+
+    const loadBlockedUsers = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("blocks")
+          .select("blocked_id")
+          .eq("blocker_id", user.id);
+
+        if (error) {
+          console.error("[OnlineUsers] Error loading blocked users:", error);
+          return;
+        }
+
+        const blockedIds = new Set((data || []).map((b) => b.blocked_id));
+        setBlockedUserIds(blockedIds);
+      } catch (error) {
+        console.error("[OnlineUsers] Error in loadBlockedUsers:", error);
+      }
+    };
+
+    loadBlockedUsers();
+  }, [user, isAuthenticated]);
+
+  // Load online users
+  useEffect(() => {
+    if (!user || !isAuthenticated) return;
+
+    const loadOnlineUsers = async () => {
+      setIsLoading(true);
+      try {
+        // Priority 1: Users I follow
+        const { data: followsData, error: followsError } = await supabase
+          .from("follows")
+          .select("following_id")
+          .eq("follower_id", user.id)
+          .limit(20);
+
+        if (followsError) {
+          console.error("[OnlineUsers] Error loading follows:", followsError);
+          // Fallback to recent conversations
+          await loadRecentConversations();
+          return;
+        }
+
+        const followingIds = (followsData || []).map((f) => f.following_id);
+
+        if (followingIds.length > 0) {
+          // Load presence and profiles for users I follow
+          const { data: presenceData, error: presenceError } = await supabase
+            .from("user_presence")
+            .select("user_id, last_seen_at")
+            .in("user_id", followingIds);
+
+          if (presenceError) {
+            console.error("[OnlineUsers] Error loading presence:", presenceError);
+            setIsLoading(false);
+            return;
+          }
+
+          // Get profiles for these users
+          const { data: profilesData, error: profilesError } = await supabase
+            .from("profiles")
+            .select("id, display_name, avatar_url")
+            .in("id", followingIds);
+
+          if (profilesError) {
+            console.error("[OnlineUsers] Error loading profiles:", profilesError);
+            setIsLoading(false);
+            return;
+          }
+
+          // Combine presence and profiles
+          const presenceMap = new Map(
+            (presenceData || []).map((p) => [p.user_id, p.last_seen_at])
+          );
+          const profilesMap = new Map(
+            (profilesData || []).map((p) => [p.id, p])
+          );
+
+          const now = new Date();
+          const usersWithPresence: UserWithPresence[] = followingIds
+            .filter((id) => id !== user.id && !blockedUserIds.has(id)) // Don't show myself or blocked users
+            .map((id) => {
+              const profile = profilesMap.get(id);
+              const lastSeen = presenceMap.get(id);
+              const lastSeenDate = lastSeen ? new Date(lastSeen) : null;
+              const isOnline =
+                lastSeenDate &&
+                (now.getTime() - lastSeenDate.getTime()) / 1000 < 60; // Online if last_seen_at < 60 seconds ago
+
+              return {
+                id,
+                display_name: profile?.display_name || null,
+                avatar_url: profile?.avatar_url || null,
+                last_seen_at: lastSeen,
+                is_online: isOnline || false,
+              };
+            })
+            .filter((u) => u.display_name !== null) // Only show users with profiles
+            .sort((a, b) => {
+              // Sort: online first, then by last_seen_at
+              if (a.is_online && !b.is_online) return -1;
+              if (!a.is_online && b.is_online) return 1;
+              if (a.last_seen_at && b.last_seen_at) {
+                return (
+                  new Date(b.last_seen_at).getTime() -
+                  new Date(a.last_seen_at).getTime()
+                );
+              }
+              return 0;
+            });
+
+          setUsers(usersWithPresence);
+        } else {
+          // No follows, fallback to recent conversations
+          await loadRecentConversations();
+        }
+      } catch (error) {
+        console.error("[OnlineUsers] Error in loadOnlineUsers:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    const loadRecentConversations = async () => {
+      try {
+        // Get recent conversations
+        const { data: conversationsData, error: conversationsError } = await supabase
+          .from("conversation_participants")
+          .select("conversation_id")
+          .eq("user_id", user.id)
+          .limit(10);
+
+        if (conversationsError) {
+          console.error("[OnlineUsers] Error loading conversations:", conversationsError);
+          return;
+        }
+
+        const conversationIds = (conversationsData || []).map((c) => c.conversation_id);
+
+        if (conversationIds.length === 0) {
+          setUsers([]);
+          return;
+        }
+
+        // Get other participants in these conversations
+        const { data: participantsData, error: participantsError } = await supabase
+          .from("conversation_participants")
+          .select("conversation_id, user_id")
+          .in("conversation_id", conversationIds)
+          .neq("user_id", user.id);
+
+        if (participantsError) {
+          console.error("[OnlineUsers] Error loading participants:", participantsError);
+          return;
+        }
+
+        const otherUserIds = [
+          ...new Set(
+            (participantsData || []).map((p) => p.user_id)
+          ),
+        ].slice(0, 20); // Limit to 20 users
+
+        if (otherUserIds.length === 0) {
+          setUsers([]);
+          return;
+        }
+
+        // Load presence and profiles
+        const { data: presenceData } = await supabase
+          .from("user_presence")
+          .select("user_id, last_seen_at")
+          .in("user_id", otherUserIds);
+
+        const { data: profilesData } = await supabase
+          .from("profiles")
+          .select("id, display_name, avatar_url")
+          .in("id", otherUserIds);
+
+        const presenceMap = new Map(
+          (presenceData || []).map((p) => [p.user_id, p.last_seen_at])
+        );
+        const profilesMap = new Map(
+          (profilesData || []).map((p) => [p.id, p])
+        );
+
+        const now = new Date();
+        const usersWithPresence: UserWithPresence[] = otherUserIds
+          .filter((id) => !blockedUserIds.has(id)) // Don't show blocked users
+          .map((id) => {
+            const profile = profilesMap.get(id);
+            const lastSeen = presenceMap.get(id);
+            const lastSeenDate = lastSeen ? new Date(lastSeen) : null;
+            const isOnline =
+              lastSeenDate &&
+              (now.getTime() - lastSeenDate.getTime()) / 1000 < 60;
+
+            return {
+              id,
+              display_name: profile?.display_name || null,
+              avatar_url: profile?.avatar_url || null,
+              last_seen_at: lastSeen,
+              is_online: isOnline || false,
+            };
+          })
+          .filter((u) => u.display_name !== null)
+          .sort((a, b) => {
+            if (a.is_online && !b.is_online) return -1;
+            if (!a.is_online && b.is_online) return 1;
+            if (a.last_seen_at && b.last_seen_at) {
+              return (
+                new Date(b.last_seen_at).getTime() -
+                new Date(a.last_seen_at).getTime()
+              );
+            }
+            return 0;
+          });
+
+        setUsers(usersWithPresence);
+      } catch (error) {
+        console.error("[OnlineUsers] Error in loadRecentConversations:", error);
+      }
+    };
+
+    loadOnlineUsers();
+
+    // Refresh every 30 seconds to update online status
+    const refreshInterval = setInterval(() => {
+      loadOnlineUsers();
+    }, 30000);
+
+    return () => {
+      clearInterval(refreshInterval);
+    };
+  }, [user, isAuthenticated, blockedUserIds]);
+
+  const handleUserClick = async (targetUserId: string) => {
+    if (!user) return;
+
+    try {
+      const { conversationId, error } = await findOrCreateDirectConversation(
+        user.id,
+        targetUserId
+      );
+
+      if (error) {
+        console.error("[OnlineUsers] Error finding/creating conversation:", error);
+        alert("Failed to open conversation. Please try again.");
+        return;
+      }
+
+      if (!conversationId) {
+        console.error("[OnlineUsers] No conversationId returned");
+        alert("Failed to open conversation. Please try again.");
+        return;
+      }
+
+      router.push(`/messages/${conversationId}`);
+    } catch (error) {
+      console.error("[OnlineUsers] Error in handleUserClick:", error);
+      alert("An error occurred. Please try again.");
+    }
+  };
+
+  const getInitials = (name: string | null | undefined, userId: string) => {
+    if (name) {
+      return name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2);
+    }
+    return userId.slice(0, 2).toUpperCase() || "U";
+  };
+
+  const formatLastSeen = (lastSeenAt: string | null) => {
+    if (!lastSeenAt) return t("profile.offline") || "Offline";
+
+    const lastSeen = new Date(lastSeenAt);
+    const now = new Date();
+    const diffMs = now.getTime() - lastSeen.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+
+    if (diffMins < 1) return t("profile.online") || "Online";
+    // Simple string replacement for translation
+    const lastSeenTemplate = t("profile.lastSeen") || "Last seen {{minutes}} min ago";
+    return lastSeenTemplate.replace("{{minutes}}", String(diffMins));
+  };
+
+  if (!isAuthenticated || !user) {
+    return null;
+  }
+
+  return (
+    <aside className="hidden lg:block fixed right-0 top-0 h-screen w-[280px] pt-24 pb-20 px-4 overflow-y-auto z-40">
+      <div className="glass-dark rounded-2xl p-4">
+        <h2 className="font-orbitron text-lg font-bold text-gold-dark mb-4">
+          {t("profile.online") || "Online"}
+        </h2>
+
+        {isLoading ? (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gold mx-auto mb-2"></div>
+            <p className="text-gray-600 text-xs">{t("common.loading") || "Loading..."}</p>
+          </div>
+        ) : users.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-gray-600 text-sm">
+              {t("profile.noOnlineUsers") || "No online users"}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {users.map((userProfile) => {
+              const displayName = userProfile.display_name || "User";
+              const initials = getInitials(userProfile.display_name, userProfile.id);
+
+              return (
+                <button
+                  key={userProfile.id}
+                  onClick={() => handleUserClick(userProfile.id)}
+                  className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-gold/10 transition-colors text-left"
+                >
+                  {/* Avatar with online indicator */}
+                  <div className="relative flex-shrink-0">
+                    {userProfile.avatar_url && isValidUrl(userProfile.avatar_url) ? (
+                      <img
+                        src={userProfile.avatar_url}
+                        alt={displayName}
+                        className="w-10 h-10 rounded-full object-cover"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = "none";
+                          const parent = target.parentElement;
+                          if (parent) {
+                            const fallback = document.createElement("div");
+                            fallback.className =
+                              "w-10 h-10 rounded-full bg-gradient-to-r from-gold to-gold-light flex items-center justify-center text-gray-900 font-bold text-xs";
+                            fallback.textContent = initials;
+                            parent.appendChild(fallback);
+                          }
+                        }}
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-r from-gold to-gold-light flex items-center justify-center text-gray-900 font-bold text-xs">
+                        {initials}
+                      </div>
+                    )}
+                    {/* Online/Offline indicator */}
+                    <div
+                      className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${
+                        userProfile.is_online ? "bg-green-500" : "bg-gray-400"
+                      }`}
+                    />
+                  </div>
+
+                  {/* Name and status */}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-900 text-sm truncate">
+                      {displayName}
+                    </p>
+                    <p className="text-xs text-gray-600 truncate">
+                      {userProfile.is_online
+                        ? t("profile.online") || "Online"
+                        : formatLastSeen(userProfile.last_seen_at)}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </aside>
+  );
+}
+

@@ -17,6 +17,44 @@ import Link from "next/link";
 import PostCard from "@/components/PostCard";
 import { isValidUrl } from "@/lib/utils";
 import { requestGuard, normalizeSupabaseError, isAuthError, debugLog, withTimeout } from "@/lib/asyncGuard";
+import { useLanguage } from "@/contexts/LanguageContext";
+import FollowersFollowingModal from "@/components/FollowersFollowingModal";
+
+// Clickable button component for Followers/Following counts
+function FollowersFollowingButton({
+  count,
+  label,
+  profileId,
+  isOwnProfile,
+  tab,
+}: {
+  count: number;
+  label: string;
+  profileId: string;
+  isOwnProfile: boolean;
+  tab: "followers" | "following";
+}) {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  return (
+    <>
+      <div
+        onClick={() => setIsModalOpen(true)}
+        className="cursor-pointer hover:opacity-80 transition-opacity"
+      >
+        <div className="text-2xl font-bold text-gold-dark">{count}</div>
+        <div className="text-sm text-gray-600">{label}</div>
+      </div>
+      <FollowersFollowingModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        profileId={profileId}
+        isOwnProfile={isOwnProfile}
+        initialTab={tab}
+      />
+    </>
+  );
+}
 
 interface Profile {
   id: string;
@@ -26,6 +64,7 @@ interface Profile {
   location: string | null;
   phone: string | null;
   website: string | null;
+  phone_public: boolean;
   created_at: string;
 }
 
@@ -33,6 +72,7 @@ export default function PublicProfilePage() {
   const params = useParams();
   const router = useRouter();
   const { isAuthenticated, user } = useAuth();
+  const { t } = useLanguage();
   const userId = params.id as string;
 
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -221,6 +261,39 @@ export default function PublicProfilePage() {
     if (user.id === userId) {
       alert("You cannot follow yourself");
       return;
+    }
+
+    // Check if user is blocked (I blocked them OR they blocked me)
+    try {
+      // Check if I blocked them
+      const { data: iBlockedThem } = await supabase
+        .from("blocks")
+        .select("id")
+        .eq("blocker_id", user.id)
+        .eq("blocked_id", userId)
+        .single();
+
+      if (iBlockedThem) {
+        alert(t("profile.cannotFollowBlocked") || "You cannot follow a user you have blocked.");
+        return;
+      }
+
+      // Check if they blocked me (if RLS allows reading blocks where blocked_id = me)
+      // Note: This might not work if RLS doesn't allow it, but we try
+      const { data: theyBlockedMe } = await supabase
+        .from("blocks")
+        .select("id")
+        .eq("blocker_id", userId)
+        .eq("blocked_id", user.id)
+        .single();
+
+      if (theyBlockedMe) {
+        alert(t("profile.cannotFollowBlocked") || "You cannot follow this user.");
+        return;
+      }
+    } catch (error) {
+      // If block check fails (e.g., RLS doesn't allow), continue with follow attempt
+      console.warn("Could not check block status (may be RLS restricted):", error);
     }
 
     // Request guard to prevent duplicate requests
@@ -494,10 +567,20 @@ export default function PublicProfilePage() {
                       <span>{profile.location}</span>
                     </div>
                   )}
-                  {profile.phone && (
+                  {/* Phone: Show only if phone_public is true OR viewer is the owner */}
+                  {profile.phone && (isOwnProfile || profile.phone_public) && (
                     <div className="flex items-center gap-1">
                       <span>📞</span>
                       <span>{profile.phone}</span>
+                    </div>
+                  )}
+                  {/* Show "Hidden" indicator if phone exists but is not public and viewer is not owner */}
+                  {profile.phone && !isOwnProfile && !profile.phone_public && (
+                    <div className="flex items-center gap-1 text-gray-400">
+                      <span>📞</span>
+                      <span className="text-xs italic">
+                        {t('profile.phoneHidden') || 'Hidden'}
+                      </span>
                     </div>
                   )}
                   {profile.website && (
@@ -565,14 +648,20 @@ export default function PublicProfilePage() {
                 <div className="text-2xl font-bold text-gold-dark">{postsCount}</div>
                 <div className="text-sm text-gray-600">Posts</div>
               </div>
-              <div>
-                <div className="text-2xl font-bold text-gold-dark">{followersCount}</div>
-                <div className="text-sm text-gray-600">Followers</div>
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-gold-dark">{followingCount}</div>
-                <div className="text-sm text-gray-600">Following</div>
-              </div>
+              <FollowersFollowingButton
+                count={followersCount}
+                label={t("profile.followers") || "Followers"}
+                profileId={userId}
+                isOwnProfile={isOwnProfile}
+                tab="followers"
+              />
+              <FollowersFollowingButton
+                count={followingCount}
+                label={t("profile.following") || "Following"}
+                profileId={userId}
+                isOwnProfile={isOwnProfile}
+                tab="following"
+              />
             </div>
           </div>
 

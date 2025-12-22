@@ -17,6 +17,44 @@ import MobileBottomNav from "@/components/MobileBottomNav";
 import Link from "next/link";
 import PostCard from "@/components/PostCard";
 import { isValidUrl } from "@/lib/utils";
+import { useLanguage } from "@/contexts/LanguageContext";
+import FollowersFollowingModal from "@/components/FollowersFollowingModal";
+
+// Clickable button component for Followers/Following counts
+function FollowersFollowingButton({
+  count,
+  label,
+  profileId,
+  isOwnProfile,
+  tab,
+}: {
+  count: number;
+  label: string;
+  profileId: string;
+  isOwnProfile: boolean;
+  tab: "followers" | "following";
+}) {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  return (
+    <>
+      <div
+        onClick={() => setIsModalOpen(true)}
+        className="cursor-pointer hover:opacity-80 transition-opacity"
+      >
+        <div className="text-2xl font-bold text-gold-dark">{count}</div>
+        <div className="text-sm text-gray-600">{label}</div>
+      </div>
+      <FollowersFollowingModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        profileId={profileId}
+        isOwnProfile={isOwnProfile}
+        initialTab={tab}
+      />
+    </>
+  );
+}
 
 interface Profile {
   id: string;
@@ -26,11 +64,13 @@ interface Profile {
   location: string | null;
   phone: string | null;
   website: string | null;
+  phone_public: boolean;
   created_at: string;
 }
 
 export default function ProfilePage() {
   const { isAuthenticated, isLoading: authLoading, loadingSession, user } = useAuth();
+  const { t } = useLanguage();
   const router = useRouter();
   const [hasRedirected, setHasRedirected] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -245,10 +285,16 @@ export default function ProfilePage() {
                       <span>{profile.location}</span>
                     </div>
                   )}
+                  {/* Phone: Always show to owner (this is own profile) */}
                   {profile?.phone && (
                     <div className="flex items-center gap-1">
                       <span>📞</span>
                       <span>{profile.phone}</span>
+                      {!profile.phone_public && (
+                        <span className="text-xs text-gray-400 italic ml-1">
+                          (Hidden from others)
+                        </span>
+                      )}
                     </div>
                   )}
                   {profile?.website && (
@@ -284,14 +330,24 @@ export default function ProfilePage() {
                 <div className="text-2xl font-bold text-gold-dark">{postsCount}</div>
                 <div className="text-sm text-gray-600">Posts</div>
               </div>
-              <div>
-                <div className="text-2xl font-bold text-gold-dark">{followersCount}</div>
-                <div className="text-sm text-gray-600">Followers</div>
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-gold-dark">{followingCount}</div>
-                <div className="text-sm text-gray-600">Following</div>
-              </div>
+              {user && (
+                <>
+                  <FollowersFollowingButton
+                    count={followersCount}
+                    label={t("profile.followers") || "Followers"}
+                    profileId={user.id}
+                    isOwnProfile={true}
+                    tab="followers"
+                  />
+                  <FollowersFollowingButton
+                    count={followingCount}
+                    label={t("profile.following") || "Following"}
+                    profileId={user.id}
+                    isOwnProfile={true}
+                    tab="following"
+                  />
+                </>
+              )}
             </div>
           </div>
 
