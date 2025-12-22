@@ -38,12 +38,12 @@ export default function WhatWeDoSection() {
   ];
 
   return (
-    <section id="what-we-do" className="py-20 px-4 bg-gradient-to-b from-transparent to-gray-100/50">
+    <section id="what-we-do" className="section-padding container-padding bg-gradient-to-b from-gray-50/30 to-white">
       <div className="max-w-6xl mx-auto">
-        <h2 className="font-orbitron text-4xl md:text-5xl font-bold text-center mb-6 text-gold-dark">
+        <h2 className="font-orbitron text-3xl md:text-4xl lg:text-5xl font-bold text-center mb-4 text-gray-900">
           What We Do
         </h2>
-        <p className="text-center text-lg text-gray-600 mb-12 max-w-2xl mx-auto">
+        <p className="text-center text-lg text-gray-600 mb-12 max-w-2xl mx-auto leading-relaxed">
           We provide comprehensive real estate services powered by advanced technology
         </p>
 

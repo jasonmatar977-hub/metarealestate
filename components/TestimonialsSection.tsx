@@ -26,12 +26,12 @@ export default function TestimonialsSection() {
   ];
 
   return (
-    <section id="testimonials" className="py-20 px-4">
+    <section id="testimonials" className="section-padding container-padding">
       <div className="max-w-6xl mx-auto">
-        <h2 className="font-orbitron text-4xl md:text-5xl font-bold text-center mb-6 text-gold-dark">
+        <h2 className="font-orbitron text-3xl md:text-4xl lg:text-5xl font-bold text-center mb-4 text-gray-900">
           Testimonials
         </h2>
-        <p className="text-center text-lg text-gray-600 mb-12 max-w-2xl mx-auto">
+        <p className="text-center text-lg text-gray-600 mb-12 max-w-2xl mx-auto leading-relaxed">
           See what our clients say about their experience with Meta Real Estate
         </p>
 
