@@ -18,7 +18,8 @@
     "contact": "Contact",
     "listings": "Listings",
     "feed": "Feed",
-    "chat": "Chat"
+    "chat": "Chat",
+    "journal": "Area Journal"
   },
   "home": {
     "title": "META REAL ESTATE",
@@ -60,6 +61,45 @@
     "subtitle": "Ask me anything about real estate",
     "placeholder": "Type your message...",
     "send": "Send"
+  },
+  "journal": {
+    "title": "Area Journal",
+    "subtitle": "Real-time market insights for Beirut neighborhoods",
+    "hubTitle": "Beirut Area Journal",
+    "hubSubtitle": "Stay informed about market trends, prices, and opportunities",
+    "lastUpdated": "Last updated",
+    "openJournal": "Open Journal",
+    "snapshot": "Snapshot (30-sec read)",
+    "status": "Status",
+    "demand": "Demand",
+    "inventoryTrend": "Inventory Trend",
+    "priceFlexibility": "Price Flexibility",
+    "priceReality": "Price Reality",
+    "rentRanges": "Rent Ranges",
+    "saleRange": "Sale Range",
+    "perSqm": "per sqm",
+    "drivingFactors": "What's driving the area now",
+    "risks": "Risks & Watch-outs",
+    "outlook": "90-Day Outlook",
+    "outlookUp": "Up",
+    "outlookSideways": "Sideways",
+    "outlookDown": "Down",
+    "whatWouldChange": "What would change this view",
+    "localNotes": "Local Notes",
+    "fromVerifiedContributors": "from verified contributors",
+    "methodology": "Methodology",
+    "lastUpdatedLabel": "Last updated",
+    "relatedListings": "Related Listings",
+    "askAI": "Ask AI about this area",
+    "discussArea": "Discuss this area",
+    "methodologyTitle": "How We Write Area Journals",
+    "methodologySubtitle": "Transparent, fact-based market analysis",
+    "heating": "Heating",
+    "cooling": "Cooling",
+    "stable": "Stable",
+    "loading": "Loading areas...",
+    "noAreas": "No areas available",
+    "error": "Error loading areas"
   }
 }
 

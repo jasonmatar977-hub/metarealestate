@@ -73,6 +73,12 @@ export default function Navbar() {
                   {t('navbar.feed')}
                 </Link>
                 <Link
+                  href="/journal"
+                  className="px-4 py-2 text-gray-700 hover:text-gold transition-colors font-semibold"
+                >
+                  {t('navbar.journal')}
+                </Link>
+                <Link
                   href="/search"
                   className="px-4 py-2 text-gray-700 hover:text-gold transition-colors font-semibold"
                   title="Search Users"
@@ -203,6 +209,13 @@ export default function Navbar() {
                     className="px-4 py-2 text-gray-700 hover:text-gold hover:bg-gold/10 transition-colors font-semibold rounded-lg"
                   >
                     {t('navbar.feed')}
+                  </Link>
+                  <Link
+                    href="/journal"
+                    onClick={closeMobileMenu}
+                    className="px-4 py-2 text-gray-700 hover:text-gold hover:bg-gold/10 transition-colors font-semibold rounded-lg"
+                  >
+                    {t('navbar.journal')}
                   </Link>
                   <Link
                     href="/search"

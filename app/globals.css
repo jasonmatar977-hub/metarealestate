@@ -12,16 +12,49 @@
 @layer base {
   body {
     @apply font-rajdhani bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50 text-gray-800;
+    /* Softer, warmer feel */
+    letter-spacing: 0.01em;
+  }
+  
+  /* Improved typography hierarchy */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-orbitron;
+    letter-spacing: -0.02em;
+  }
+  
+  /* Softer link transitions */
+  a {
+    transition: all 0.2s ease-in-out;
   }
 }
 
 @layer utilities {
   .glass {
-    @apply bg-white/90 backdrop-blur-lg border border-gold/40 shadow-lg;
+    @apply bg-white/90 backdrop-blur-lg border border-gold/30 shadow-lg;
+    transition: all 0.2s ease-in-out;
   }
   
   .glass-dark {
-    @apply bg-white/95 backdrop-blur-xl border-2 border-gold/50 shadow-xl;
+    @apply bg-white/95 backdrop-blur-xl border-2 border-gold/40 shadow-xl;
+    transition: all 0.2s ease-in-out;
+  }
+  
+  /* Softer hover states */
+  .glass:hover {
+    @apply border-gold/50 shadow-xl;
+  }
+  
+  .glass-dark:hover {
+    @apply border-gold/60 shadow-2xl;
+  }
+  
+  /* Improved spacing utilities */
+  .section-padding {
+    @apply py-16 md:py-20 lg:py-24;
+  }
+  
+  .container-padding {
+    @apply px-4 sm:px-6 lg:px-8;
   }
 }
 

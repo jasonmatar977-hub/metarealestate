@@ -121,9 +121,9 @@ myproject/
    ```bash
    npm run dev
    ```
+   The dev server runs on **port 3001** by default. Open [http://localhost:3001](http://localhost:3001)
 
-5. **Open your browser:**
-   Navigate to [http://localhost:3000](http://localhost:3000)
+   **Important:** If you encounter "ChunkLoadError", see [DEV_SETUP.md](./DEV_SETUP.md) for troubleshooting.
 
 ### Supabase Setup
 

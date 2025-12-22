@@ -14,6 +14,14 @@ interface GlobalErrorProps {
 }
 
 export default function GlobalError({ error, reset }: GlobalErrorProps) {
+  // Detect ChunkLoadError (common in dev mode)
+  const isChunkLoadError = 
+    error.message?.includes('Loading chunk') ||
+    error.message?.includes('ChunkLoadError') ||
+    error.message?.includes('Failed to fetch dynamically imported module') ||
+    error.name === 'ChunkLoadError' ||
+    (typeof window !== 'undefined' && error.message?.includes('timeout'));
+
   // Detect if running in WhatsApp in-app browser
   const isWhatsApp = typeof window !== 'undefined' && 
     /WhatsApp/i.test(navigator.userAgent);
@@ -24,16 +32,27 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
     error.name === 'SecurityError';
 
   useEffect(() => {
-    // Log critical error to console
+    // Log critical error to console with better diagnostics
     console.error("=== GLOBAL ERROR (ROOT LEVEL) ===");
-    console.error("This is a critical error that occurred at the root of the application");
-    console.error("Error message:", error.message);
-    console.error("Error stack:", error.stack);
-    console.error("Error digest:", error.digest);
     console.error("Error name:", error.name);
+    console.error("Error message:", error.message);
+    console.error("Error digest:", error.digest);
+    
+    if (error.stack) {
+      console.error("Error stack:", error.stack);
+    }
     
     if (error.cause) {
       console.error("Error cause:", error.cause);
+    }
+
+    if (isChunkLoadError) {
+      console.error("🔴 CHUNK LOAD ERROR DETECTED");
+      console.error("This usually happens when:");
+      console.error("1. Dev server restarted but browser has old chunks cached");
+      console.error("2. Port mismatch (server on 3000, browser cached 3001)");
+      console.error("3. Hot reload failed to update chunks");
+      console.error("Solution: Hard refresh (Ctrl+Shift+R or Cmd+Shift+R)");
     }
 
     if (isStorageError) {
@@ -42,7 +61,7 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
 
     // In production, send to error tracking service immediately
     // Example: Sentry.captureException(error, { level: 'fatal' });
-  }, [error, isStorageError]);
+  }, [error, isChunkLoadError, isStorageError]);
 
   return (
     <html lang="en">
@@ -83,6 +102,39 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
               )}
             </div>
 
+            {isChunkLoadError && (
+              <div className="mb-6 p-4 bg-blue-50 border-2 border-blue-300 rounded-xl">
+                <p className="text-sm text-blue-800 font-semibold mb-2">
+                  🔄 Chunk Load Error (Dev Mode)
+                </p>
+                <p className="text-xs text-blue-700 mb-3">
+                  This happens when the dev server restarts or chunks are stale. A hard refresh will fix it.
+                </p>
+                <button
+                  onClick={() => {
+                    if (typeof window !== 'undefined') {
+                      // Clear Next.js cache and reload
+                      if ('caches' in window) {
+                        caches.keys().then((names) => {
+                          names.forEach((name) => {
+                            caches.delete(name);
+                          });
+                        });
+                      }
+                      // Force reload bypassing cache
+                      window.location.reload();
+                    }
+                  }}
+                  className="w-full px-4 py-2 bg-blue-500 text-white font-semibold rounded-lg hover:bg-blue-600 transition-colors text-sm mb-2"
+                >
+                  Hard Refresh & Clear Cache
+                </button>
+                <p className="text-xs text-blue-600 mt-2">
+                  Or press <kbd className="px-2 py-1 bg-blue-100 rounded">Ctrl+Shift+R</kbd> (Windows) or <kbd className="px-2 py-1 bg-blue-100 rounded">Cmd+Shift+R</kbd> (Mac)
+                </p>
+              </div>
+            )}
+
             {(isWhatsApp || isStorageError) && (
               <div className="mb-6 p-4 bg-yellow-50 border-2 border-yellow-300 rounded-xl">
                 <p className="text-sm text-yellow-800 font-semibold mb-2">
@@ -115,39 +167,67 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
             )}
 
             <div className="flex flex-col gap-4">
-              <button
-                onClick={() => {
-                  try {
-                    // Reset the error boundary
-                    reset();
-                    // Also reload the page as a fallback
+              {isChunkLoadError ? (
+                <button
+                  onClick={() => {
                     if (typeof window !== 'undefined') {
-                      setTimeout(() => {
-                        window.location.href = '/';
-                      }, 100);
+                      // Clear all caches
+                      if ('caches' in window) {
+                        caches.keys().then((names) => {
+                          names.forEach((name) => caches.delete(name));
+                        });
+                      }
+                      // Clear service workers if any
+                      if ('serviceWorker' in navigator) {
+                        navigator.serviceWorker.getRegistrations().then((registrations) => {
+                          registrations.forEach((registration) => registration.unregister());
+                        });
+                      }
+                      // Force reload
+                      window.location.reload();
                     }
-                  } catch (resetError) {
-                    // Prevent crash loop - if reset fails, just reload
-                    console.error("Reset failed, reloading page:", resetError);
-                    if (typeof window !== 'undefined') {
-                      window.location.href = '/';
-                    }
-                  }
-                }}
-                className="px-6 py-3 bg-gradient-to-r from-gold to-gold-light text-gray-900 font-bold rounded-xl hover:shadow-lg transition-all"
-              >
-                Reload Application
-              </button>
-              <button
-                onClick={() => {
-                  if (typeof window !== 'undefined') {
-                    window.location.reload();
-                  }
-                }}
-                className="px-6 py-3 bg-white border-2 border-gold text-gold font-bold rounded-xl hover:bg-gold hover:text-gray-900 transition-all"
-              >
-                Hard Refresh
-              </button>
+                  }}
+                  className="px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold rounded-xl hover:shadow-lg transition-all"
+                >
+                  Hard Refresh Required (Clears Cache)
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={() => {
+                      try {
+                        // Reset the error boundary
+                        reset();
+                        // Also reload the page as a fallback
+                        if (typeof window !== 'undefined') {
+                          setTimeout(() => {
+                            window.location.href = '/';
+                          }, 100);
+                        }
+                      } catch (resetError) {
+                        // Prevent crash loop - if reset fails, just reload
+                        console.error("Reset failed, reloading page:", resetError);
+                        if (typeof window !== 'undefined') {
+                          window.location.href = '/';
+                        }
+                      }
+                    }}
+                    className="px-6 py-3 bg-gradient-to-r from-gold to-gold-light text-gray-900 font-bold rounded-xl hover:shadow-lg transition-all"
+                  >
+                    Reload Application
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (typeof window !== 'undefined') {
+                        window.location.reload();
+                      }
+                    }}
+                    className="px-6 py-3 bg-white border-2 border-gold text-gold font-bold rounded-xl hover:bg-gold hover:text-gray-900 transition-all"
+                  >
+                    Hard Refresh
+                  </button>
+                </>
+              )}
             </div>
 
             <div className="mt-8 pt-6 border-t border-gold/20">

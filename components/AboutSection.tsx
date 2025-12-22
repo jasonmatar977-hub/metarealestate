@@ -5,11 +5,14 @@
 
 export default function AboutSection() {
   return (
-    <section id="about" className="py-20 px-4">
+    <section id="about" className="section-padding container-padding bg-gradient-to-b from-transparent to-gray-50/30">
       <div className="max-w-6xl mx-auto">
-        <h2 className="font-orbitron text-4xl md:text-5xl font-bold text-center mb-6 text-gold-dark">
+        <h2 className="font-orbitron text-3xl md:text-4xl lg:text-5xl font-bold text-center mb-4 text-gray-900">
           About Us
         </h2>
+        <p className="text-center text-gray-600 mb-8 max-w-2xl mx-auto text-lg">
+          Building trust through transparency and clarity
+        </p>
         <div className="glass-dark rounded-3xl p-8 md:p-12 shadow-xl">
           <p className="text-lg md:text-xl text-gray-700 mb-6 text-center leading-relaxed">
             At <strong className="text-gold">Meta Real Estate</strong>, we revolutionize the way you discover and acquire property. 
