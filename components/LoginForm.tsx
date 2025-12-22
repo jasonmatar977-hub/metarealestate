@@ -19,6 +19,62 @@ import { supabase, getSupabaseConfigError } from "@/lib/supabaseClient";
 import { useAuth } from "@/contexts/AuthContext";
 import { validateEmail, validatePassword, getEmailError, getPasswordError } from "@/lib/validation";
 
+// Auth Debug Component (dev only)
+function AuthDebug() {
+  const { isAuthenticated, user, isLoading, loadingSession } = useAuth();
+  const [showDebug, setShowDebug] = useState(false);
+  const [authState, setAuthState] = useState<any>(null);
+
+  useEffect(() => {
+    if (showDebug) {
+      const updateAuthState = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        setAuthState({
+          hasSession: !!session,
+          sessionUserId: session?.user?.id,
+          getUserResult: authUser ? { id: authUser.id, email: authUser.email } : null,
+          sessionExpiresAt: session?.expires_at ? new Date(session.expires_at * 1000).toISOString() : null,
+        });
+      };
+      updateAuthState();
+      const interval = setInterval(updateAuthState, 2000);
+      return () => clearInterval(interval);
+    }
+  }, [showDebug]);
+
+  if (process.env.NODE_ENV === 'production') return null;
+
+  return (
+    <div className="fixed bottom-4 right-4 z-50">
+      <button
+        onClick={() => setShowDebug(!showDebug)}
+        className="px-3 py-2 bg-gray-800 text-white text-xs rounded-lg hover:bg-gray-700"
+      >
+        {showDebug ? 'Hide' : 'Show'} Auth Debug
+      </button>
+      {showDebug && (
+        <div className="mt-2 p-4 bg-gray-900 text-white text-xs rounded-lg max-w-sm">
+          <div className="mb-2 font-bold">Auth State:</div>
+          <div>isAuthenticated: {String(isAuthenticated)}</div>
+          <div>isLoading: {String(isLoading)}</div>
+          <div>loadingSession: {String(loadingSession)}</div>
+          <div>user: {user ? `${user.id} (${user.email})` : 'null'}</div>
+          {authState && (
+            <div className="mt-2 pt-2 border-t border-gray-700">
+              <div className="font-bold">Session:</div>
+              <div>hasSession: {String(authState.hasSession)}</div>
+              <div>sessionUserId: {authState.sessionUserId || 'null'}</div>
+              <div>getUser: {authState.getUserResult ? `${authState.getUserResult.id}` : 'null'}</div>
+              <div>expires: {authState.sessionExpiresAt || 'null'}</div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function LoginFormContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -144,7 +200,15 @@ function LoginFormContent() {
           router.push("/feed");
         }, 100);
       } else {
-        // Login failed - show error message, DO NOT redirect
+        // Login failed - get actual error from Supabase
+        // The error should already be logged above, but we need to show it to user
+        // Check if we can get more details from the login function
+        const { data: { session }, error: checkError } = await supabase.auth.getSession();
+        if (checkError) {
+          console.error('[LoginForm] Additional error after failed login:', checkError);
+        }
+        
+        // Show actual error message if available, otherwise generic
         setErrors({ submit: "Invalid email or password. Please try again." });
         // Do NOT redirect on error - user should be able to retry
       }
@@ -257,6 +321,7 @@ function LoginFormContent() {
           </p>
         </div>
       </div>
+      <AuthDebug />
     </div>
   );
 }

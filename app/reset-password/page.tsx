@@ -34,6 +34,7 @@ export default function ResetPasswordPage() {
     setIsLoading(true);
     try {
       // Use Supabase password reset
+      // IMPORTANT: redirectTo must match Supabase dashboard redirect URLs
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/update-password`,
       });
