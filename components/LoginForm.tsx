@@ -319,6 +319,51 @@ function LoginFormContent() {
               Create Account
             </a>
           </p>
+
+          {/* Reset Login Button - Safety fallback */}
+          <div className="mt-6 pt-6 border-t border-gold/20">
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  console.log('[LoginForm] Reset login clicked - clearing auth state');
+                  // Clear Supabase session
+                  await supabase.auth.signOut({ scope: 'local' });
+                  
+                  // Clear all Supabase storage keys
+                  if (typeof window !== 'undefined') {
+                    const allKeys = Object.keys(localStorage);
+                    allKeys.forEach(key => {
+                      if (key.startsWith('sb-') || key.includes('supabase.auth.token')) {
+                        localStorage.removeItem(key);
+                      }
+                    });
+                    
+                    const sessionKeys = Object.keys(sessionStorage);
+                    sessionKeys.forEach(key => {
+                      if (key.startsWith('sb-') || key.includes('supabase.auth.token')) {
+                        sessionStorage.removeItem(key);
+                      }
+                    });
+                  }
+                  
+                  console.log('[LoginForm] Auth state cleared, reloading page');
+                  // Reload page to reset all state
+                  window.location.reload();
+                } catch (error) {
+                  console.error('[LoginForm] Error resetting login:', error);
+                  // Still reload even if error
+                  window.location.reload();
+                }
+              }}
+              className="w-full px-4 py-2 text-sm text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-gray-300 hover:border-red-300"
+            >
+              🔄 Reset Login (Clear Cache)
+            </button>
+            <p className="text-xs text-gray-500 text-center mt-2">
+              Use this if you're stuck on "Signing in..."
+            </p>
+          </div>
         </div>
       </div>
       <AuthDebug />

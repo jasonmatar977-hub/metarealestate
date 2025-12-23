@@ -109,16 +109,34 @@ export default function FeedPage() {
         postsQuery = postsQuery.in('user_id', followedUserIds);
       }
 
-      const { data: postsData, error: postsError } = await postsQuery;
+      // Add timeout to prevent infinite loading (8 seconds)
+      const postsQueryPromise = Promise.resolve(postsQuery) as Promise<{ data: any; error: any }>;
+      const postsResult = await Promise.race([
+        postsQueryPromise,
+        new Promise<{ data: null; error: { message: string } }>((_, reject) => 
+          setTimeout(() => reject({ data: null, error: { message: 'Posts query timed out after 8 seconds' } }), 8000)
+        )
+      ]).catch((error) => {
+        console.error('[Feed] Posts query timeout:', error);
+        setIsLoadingPosts(false);
+        setError(error?.error?.message || 'Failed to load posts. Please try again.');
+        return { data: null, error: { message: 'Query timed out' } };
+      });
+      
+      const { data: postsData, error: postsError } = postsResult;
 
       if (postsError) {
-        console.error("=== POSTS ERROR ===");
-        console.error("Full error:", postsError);
-        console.error("Error message:", postsError.message);
-        console.error("Error details:", postsError.details);
-        console.error("Error hint:", postsError.hint);
-        console.error("Error code:", postsError.code);
-        throw postsError;
+        // Improved error logging - log actual error details, not "[Object]"
+        console.error("[Feed] Posts query error details:", {
+          message: postsError.message,
+          code: postsError.code,
+          details: postsError.details,
+          hint: postsError.hint,
+          status: (postsError as any).status,
+        });
+        setIsLoadingPosts(false);
+        setError(postsError.message || "Failed to load posts. Please try again.");
+        return;
       }
 
       console.log("Posts fetched:", postsData?.length || 0);
@@ -130,29 +148,45 @@ export default function FeedPage() {
       }
 
       // Step 3: Get unique user IDs from posts
-      const userIds = [...new Set(postsData.map((p) => p.user_id))];
+      const userIds = [...new Set(postsData.map((p: any) => p.user_id))];
       console.log("Unique user IDs:", userIds);
 
-      // Step 4: Fetch profiles for these users
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, display_name')
-        .in('id', userIds);
+      // Step 4: Fetch profiles for these users (with timeout - 8 seconds)
+      const profilesQueryPromise = Promise.resolve(
+        supabase
+          .from('profiles')
+          .select('id, display_name')
+          .in('id', userIds)
+      ) as Promise<{ data: any; error: any }>;
+      
+      const profilesResult = await Promise.race([
+        profilesQueryPromise,
+        new Promise<{ data: null; error: { message: string } }>((_, reject) => 
+          setTimeout(() => reject({ data: null, error: { message: 'Profiles query timed out after 8 seconds' } }), 8000)
+        )
+      ]).catch((error) => {
+        console.error('[Feed] Profiles query timeout:', error);
+        // Continue without profiles - posts will still show
+        return { data: null, error: { message: 'Query timed out' } };
+      });
+      
+      const { data: profilesData, error: profilesError } = profilesResult;
 
       if (profilesError) {
-        console.error("=== PROFILES ERROR ===");
-        console.error("Full error:", profilesError);
-        console.error("Error message:", profilesError.message);
-        console.error("Error details:", profilesError.details);
-        console.error("Error hint:", profilesError.hint);
-        console.error("Error code:", profilesError.code);
-        // Continue without profiles if error
+        // Improved error logging - log actual error details, not "[Object]"
+        console.error("[Feed] Profiles query error details:", {
+          message: profilesError.message,
+          code: profilesError.code,
+          details: profilesError.details,
+          hint: profilesError.hint,
+        });
+        // Continue without profiles if error - posts will still show
       }
 
       console.log("Profiles fetched:", profilesData?.length || 0);
 
       // Step 5: Get like counts and user's likes
-      const postIds = postsData.map((p) => p.id);
+      const postIds = postsData.map((p: any) => p.id);
       const { data: likesData, error: likesError } = await supabase
         .from('likes')
         .select('post_id, user_id')
@@ -182,13 +216,13 @@ export default function FeedPage() {
 
       // Step 7: Merge data
       const profilesMap = new Map(
-        (profilesData || []).map((p) => [p.id, p])
+        (profilesData || []).map((p: any) => [p.id, p])
       );
 
-      const postsWithData = postsData.map((post) => {
+      const postsWithData = postsData.map((post: any) => {
         const profile = profilesMap.get(post.user_id);
-        const postLikes = (likesData || []).filter((l) => l.post_id === post.id);
-        const postComments = (commentsData || []).filter((c) => c.post_id === post.id);
+        const postLikes = (likesData || []).filter((l: any) => l.post_id === post.id);
+        const postComments = (commentsData || []).filter((c: any) => c.post_id === post.id);
         
         // Debug log image URLs
         if (post.image_url) {
@@ -200,9 +234,9 @@ export default function FeedPage() {
         
         return {
           ...post,
-          profile: profile ? { display_name: profile.display_name } : undefined,
+          profile: profile ? { display_name: (profile as any).display_name } : undefined,
           likes_count: postLikes.length,
-          user_liked: postLikes.some((l) => l.user_id === user.id),
+          user_liked: postLikes.some((l: any) => l.user_id === user.id),
           comments_count: postComments.length,
         };
       });

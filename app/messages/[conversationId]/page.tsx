@@ -58,6 +58,7 @@ export default function ChatPage() {
   const hasLoadedRef = useRef(false);
   const loadingRef = useRef(false);
   const subscriptionRef = useRef<any>(null);
+  const isSettingUpSubscriptionRef = useRef(false); // Guard for React Strict Mode
 
   useEffect(() => {
     if (!loadingSession && !isLoading && !isAuthenticated) {
@@ -375,7 +376,8 @@ export default function ChatPage() {
       });
 
     subscriptionRef.current = channel;
-  }, [conversationId]);
+    isSettingUpSubscriptionRef.current = false; // Reset guard after setup
+  }, [conversationId, user?.id]);
 
   // Load conversation data when component mounts or user/conversation changes
   useEffect(() => {

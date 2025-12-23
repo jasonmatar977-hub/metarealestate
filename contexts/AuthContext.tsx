@@ -431,9 +431,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   /**
    * Register new user with Supabase
+   * CRITICAL: Always sets loading=false in finally block
    */
   const register = async (userData: RegisterData): Promise<boolean> => {
     try {
+      setIsLoading(true);
       const { data, error } = await supabase.auth.signUp({
         email: userData.email,
         password: userData.password,
@@ -446,7 +448,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (error) {
-        console.error('Registration error:', error);
+        const normalized = normalizeSupabaseError(error);
+        debugLog('[AuthContext] Registration error:', normalized);
+        console.error('[AuthContext] Registration error details:', {
+          message: error.message,
+          code: (error as any).code,
+          details: (error as any).details,
+          hint: (error as any).hint,
+        });
+        setIsAuthenticated(false);
+        setUser(null);
         return false;
       }
 
@@ -461,10 +472,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      setIsAuthenticated(false);
+      setUser(null);
       return false;
-    } catch (error) {
-      console.error('Registration error:', error);
+    } catch (error: any) {
+      const normalized = normalizeSupabaseError(error);
+      debugLog('[AuthContext] Registration exception:', normalized);
+      console.error('[AuthContext] Registration exception details:', {
+        message: error?.message,
+        error,
+      });
+      setIsAuthenticated(false);
+      setUser(null);
       return false;
+    } finally {
+      // ALWAYS reset loading state - critical to prevent stuck UI
+      setIsLoading(false);
     }
   };
 

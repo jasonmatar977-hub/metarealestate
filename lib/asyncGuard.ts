@@ -4,26 +4,71 @@
  */
 
 /**
- * Wraps a promise with a timeout
+ * Wraps a promise with a timeout and AbortController
  * Rejects after specified milliseconds if promise doesn't resolve
+ * Returns both the result and an AbortController for cleanup
  */
 export async function withTimeout<T>(
   promise: Promise<T>,
   ms: number,
   label: string = 'Operation'
 ): Promise<T> {
+  const abortController = new AbortController();
+  
   const timeout = new Promise<never>((_, reject) => {
     const timer = setTimeout(() => {
+      abortController.abort();
       reject(new Error(`${label} timed out after ${ms}ms`));
     }, ms);
-    // Clear timeout if promise resolves first (though this won't actually clear it)
-    // The race will handle it
+    
+    // Clear timeout if promise resolves first
+    promise.finally(() => {
+      clearTimeout(timer);
+    });
   });
 
   try {
     return await Promise.race([promise, timeout]);
-  } finally {
-    // Note: We can't actually clear the timeout here, but the race handles it
+  } catch (error) {
+    // Log detailed error information
+    if (process.env.NODE_ENV === 'development') {
+      const normalized = normalizeSupabaseError(error);
+      console.error(`[withTimeout] ${label} failed:`, {
+        message: normalized.message,
+        code: normalized.code,
+        details: normalized.details,
+        hint: normalized.hint,
+        status: normalized.status,
+        originalError: error,
+      });
+    }
+    throw error;
+  }
+}
+
+/**
+ * Enhanced error logging for Supabase errors
+ * Logs error.code, error.message, error.details, error.hint instead of "[Object]"
+ */
+export function logSupabaseError(error: any, context: string = 'Supabase'): void {
+  if (!error) {
+    console.error(`[${context}] Error is null or undefined`);
+    return;
+  }
+
+  const normalized = normalizeSupabaseError(error);
+  
+  console.error(`[${context}] Error details:`, {
+    message: normalized.message,
+    code: normalized.code,
+    details: normalized.details,
+    hint: normalized.hint,
+    status: normalized.status,
+  });
+
+  // Also log full error for debugging
+  if (process.env.NODE_ENV === 'development') {
+    console.error(`[${context}] Full error object:`, error);
   }
 }
 
