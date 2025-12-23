@@ -56,19 +56,38 @@ export default function OnlineUsersSidebar() {
     loadBlockedUsers();
   }, [user, isAuthenticated]);
 
-  // Load online users
+  // Load online users (with timeout and error handling)
   useEffect(() => {
     if (!user || !isAuthenticated) return;
+
+    const abortController = new AbortController();
+    const timeoutId = setTimeout(() => {
+      abortController.abort();
+    }, 10000); // 10 second timeout
 
     const loadOnlineUsers = async () => {
       setIsLoading(true);
       try {
-        // Priority 1: Users I follow
-        const { data: followsData, error: followsError } = await supabase
-          .from("follows")
-          .select("following_id")
-          .eq("follower_id", user.id)
-          .limit(20);
+        // Priority 1: Users I follow (with timeout)
+        const followsQueryPromise = Promise.resolve(
+          supabase
+            .from("follows")
+            .select("following_id")
+            .eq("follower_id", user.id)
+            .limit(20)
+        ) as Promise<{ data: any; error: any }>;
+        
+        const followsResult = await Promise.race([
+          followsQueryPromise,
+          new Promise<{ data: null; error: { message: string } }>((_, reject) => 
+            setTimeout(() => reject({ data: null, error: { message: 'Query timed out' } }), 8000)
+          )
+        ]).catch((error) => {
+          console.error('[OnlineUsers] Follows query timeout:', error);
+          return { data: null, error: { message: 'Query timed out' } };
+        });
+        
+        const { data: followsData, error: followsError } = followsResult;
 
         if (followsError) {
           console.error("[OnlineUsers] Error loading follows:", followsError);
@@ -77,7 +96,7 @@ export default function OnlineUsersSidebar() {
           return;
         }
 
-        const followingIds = (followsData || []).map((f) => f.following_id);
+        const followingIds = (followsData || []).map((f: any) => f.following_id);
 
         if (followingIds.length > 0) {
           // Load presence and profiles for users I follow
@@ -114,8 +133,8 @@ export default function OnlineUsersSidebar() {
 
           const now = new Date();
           const usersWithPresence: UserWithPresence[] = followingIds
-            .filter((id) => id !== user.id && !blockedUserIds.has(id)) // Don't show myself or blocked users
-            .map((id) => {
+            .filter((id: string) => id !== user.id && !blockedUserIds.has(id)) // Don't show myself or blocked users
+            .map((id: string) => {
               const profile = profilesMap.get(id);
               const lastSeen = presenceMap.get(id);
               const lastSeenDate = lastSeen ? new Date(lastSeen) : null;
@@ -131,8 +150,8 @@ export default function OnlineUsersSidebar() {
                 is_online: isOnline || false,
               };
             })
-            .filter((u) => u.display_name !== null) // Only show users with profiles
-            .sort((a, b) => {
+            .filter((u: UserWithPresence) => u.display_name !== null) // Only show users with profiles
+            .sort((a: UserWithPresence, b: UserWithPresence) => {
               // Sort: online first, then by last_seen_at
               if (a.is_online && !b.is_online) return -1;
               if (!a.is_online && b.is_online) return 1;

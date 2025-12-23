@@ -14,7 +14,7 @@ import Navbar from "@/components/Navbar";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import Link from "next/link";
 import { isValidUrl } from "@/lib/utils";
-import { requestGuard, normalizeSupabaseError, isAuthError, debugLog, withTimeout } from "@/lib/asyncGuard";
+import { requestGuard, normalizeSupabaseError, isAuthError, debugLog, withTimeout, logSupabaseError } from "@/lib/asyncGuard";
 
 interface Conversation {
   id: string;
@@ -93,14 +93,8 @@ export default function MessagesPage() {
         const normalized = normalizeSupabaseError(participantsQueryError);
         const status = (participantsQueryError as any).status;
         
-        console.error("[Messages] Participants query error:", {
-          message: participantsQueryError.message,
-          code: participantsQueryError.code,
-          status: status,
-          details: participantsQueryError.details,
-          hint: participantsQueryError.hint,
-          fullError: participantsQueryError
-        });
+        // Improved error logging - log actual error details, not "[Object]"
+        logSupabaseError(participantsQueryError, '[Messages] Participants query');
         
         setIsLoadingConversations(false);
         setConversations([]);
@@ -149,15 +143,8 @@ export default function MessagesPage() {
         const normalized = normalizeSupabaseError(conversationsError);
         const status = (conversationsError as any).status;
         
-        // Log full error details
-        console.error("[Messages] Conversations query error:", {
-          message: conversationsError.message,
-          code: conversationsError.code,
-          status: status,
-          details: conversationsError.details,
-          hint: conversationsError.hint,
-          fullError: conversationsError
-        });
+        // Improved error logging - log actual error details, not "[Object]"
+        logSupabaseError(conversationsError, '[Messages] Conversations query');
         
         // STOP loading immediately on any error
         setIsLoadingConversations(false);
