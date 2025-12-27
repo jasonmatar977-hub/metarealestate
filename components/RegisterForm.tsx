@@ -153,12 +153,12 @@ export default function RegisterForm() {
         password: formData.password, // Backend must hash this!
       });
 // the user must confirm email first then sign in
-      if (success) {
+     if (success) {
   router.push("/login?message=Check your email to confirm your account, then sign in.");
-      }
-      } else {
-        setErrors({ submit: "Registration failed. Please try again." });
-      }
+} else {
+  setErrors({ submit: "Registration failed. Please try again." });
+}
+
     } catch (error) {
       setErrors({ submit: "An error occurred. Please try again." });
     } finally {
