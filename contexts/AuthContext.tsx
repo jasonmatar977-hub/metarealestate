@@ -429,13 +429,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [loadUserProfile, handleSessionHealthCheck]);
 
-  /**
+   /**
    * Register new user with Supabase
-   * CRITICAL: Always sets loading=false in finally block
+   * Email confirmation ON (most common)
+   * Do NOT set isAuthenticated=true unless we receive a session
    */
   const register = async (userData: RegisterData): Promise<boolean> => {
     try {
       setIsLoading(true);
+
       const { data, error } = await supabase.auth.signUp({
         email: userData.email,
         password: userData.password,
@@ -448,48 +450,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (error) {
-        const normalized = normalizeSupabaseError(error);
-        debugLog('[AuthContext] Registration error:', normalized);
-        console.error('[AuthContext] Registration error details:', {
-          message: error.message,
-          code: (error as any).code,
-          details: (error as any).details,
-          hint: (error as any).hint,
-        });
+        console.error("[AuthContext] Registration error:", error);
         setIsAuthenticated(false);
         setUser(null);
         return false;
       }
 
-      if (data.user) {
-        // Profile will be created automatically by trigger
-        // But we can update it with additional info if needed
-        const userProfile = await loadUserProfile(data.user);
-        if (userProfile) {
-          setIsAuthenticated(true);
-          setUser(userProfile);
-          return true;
-        }
+      //  IMPORTANT:
+      // If Email Confirmation is enabled in Supabase,
+      // signUp succeeds but data.session is NULL until user confirms email.
+      if (!data.session) {
+        setIsAuthenticated(false);
+        setUser(null);
+        return true; // registration success, but NOT logged in yet
+      }
+
+      //  If session exists, user is logged in immediately
+      const userProfile = await loadUserProfile(data.session.user);
+      if (userProfile) {
+        setIsAuthenticated(true);
+        setUser(userProfile);
+        return true;
       }
 
       setIsAuthenticated(false);
       setUser(null);
       return false;
-    } catch (error: any) {
-      const normalized = normalizeSupabaseError(error);
-      debugLog('[AuthContext] Registration exception:', normalized);
-      console.error('[AuthContext] Registration exception details:', {
-        message: error?.message,
-        error,
-      });
+    } catch (err: any) {
+      console.error("[AuthContext] Registration exception:", err);
       setIsAuthenticated(false);
       setUser(null);
       return false;
     } finally {
-      // ALWAYS reset loading state - critical to prevent stuck UI
       setIsLoading(false);
     }
   };
+
 
   /**
    * Logout from Supabase
