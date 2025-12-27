@@ -429,7 +429,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [loadUserProfile, handleSessionHealthCheck]);
 
-   /**
+  /**
    * Register new user with Supabase
    * Email confirmation ON (most common)
    * Do NOT set isAuthenticated=true unless we receive a session
