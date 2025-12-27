@@ -152,9 +152,10 @@ export default function RegisterForm() {
         birthday: formData.birthday,
         password: formData.password, // Backend must hash this!
       });
-
+// the user must confirm email first then sign in
       if (success) {
-        router.push("/listings");
+  router.push("/login?message=Check your email to confirm your account, then sign in.");
+      }
       } else {
         setErrors({ submit: "Registration failed. Please try again." });
       }
@@ -392,4 +393,3 @@ export default function RegisterForm() {
     </div>
   );
 }
-
