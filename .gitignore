@@ -34,3 +34,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# keep other projects out of this repo
+macrolens/
+
+# always ignore build + deps everywhere
+.next/
+node_modules/
