@@ -12,6 +12,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import Navbar from "@/components/Navbar";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { checkSupabaseHealth, clearHealthCheckCache } from "@/lib/supabaseHealth";
 
 export default function ResetPasswordPage() {
   const { t } = useLanguage();
@@ -20,6 +21,7 @@ export default function ResetPasswordPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,20 +34,92 @@ export default function ResetPasswordPage() {
     }
 
     setIsLoading(true);
+    setError(null);
+    setSuccess(false);
+    
     try {
+      // Check Supabase health first
+      const healthCheck = await checkSupabaseHealth();
+      if (!healthCheck.isOnline) {
+        console.error('[ResetPassword] Supabase offline:', healthCheck.error);
+        setIsLoading(false);
+        setError(healthCheck.error || 'Supabase is currently unavailable. Please try again later.');
+        return;
+      }
+      
+      const normalizedEmail = email.trim().toLowerCase();
+      const redirectTo = typeof window !== 'undefined' 
+        ? `${window.location.origin}/update-password`
+        : '/update-password';
+      
+      // DEBUG: Log before reset
+      console.log('[ResetPassword] resetPasswordForEmail - Before call:', {
+        email: normalizedEmail,
+        redirectTo,
+        origin: typeof window !== 'undefined' ? window.location.origin : 'SSR',
+        supabaseUrl: typeof window !== 'undefined' ? (process.env.NEXT_PUBLIC_SUPABASE_URL?.substring(0, 30) + '...') : 'SSR',
+      });
+      
       // Use Supabase password reset
       // IMPORTANT: redirectTo must match Supabase dashboard redirect URLs
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/update-password`,
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+        redirectTo,
+      });
+      
+      // DEBUG: Log result
+      console.log('[ResetPassword] resetPasswordForEmail - Result:', {
+        hasError: !!resetError,
+        errorMessage: resetError?.message,
+        errorCode: (resetError as any)?.code,
+        errorStatus: (resetError as any)?.status,
       });
 
       if (resetError) {
-        setError(resetError.message || "Failed to send reset email. Please try again.");
+        console.error('[ResetPassword] resetPasswordForEmail - ERROR:', {
+          message: resetError.message,
+          code: (resetError as any).code,
+          status: (resetError as any).status,
+          details: (resetError as any).details,
+          hint: (resetError as any).hint,
+        });
+        
+        // Check for network errors
+        const errorMessage = resetError.message || '';
+        const isNetworkError = errorMessage.includes('Failed to fetch') ||
+                              errorMessage.includes('ERR_NAME_NOT_RESOLVED') ||
+                              errorMessage.includes('ERR_NETWORK') ||
+                              errorMessage.includes('network') ||
+                              (resetError as any).name === 'TypeError';
+        
+        if (isNetworkError) {
+          console.error('[ResetPassword] Network error - clearing health cache');
+          clearHealthCheckCache();
+          setError('Cannot connect to Supabase. It may be paused, offline, or there is a network issue. Please try again.');
+        } else {
+          setError(resetError.message || "Failed to send reset email. Please try again.");
+        }
       } else {
+        console.log('[ResetPassword] resetPasswordForEmail - SUCCESS');
         setSuccess(true);
       }
     } catch (err: any) {
-      setError(err.message || "An error occurred. Please try again.");
+      console.error('[ResetPassword] resetPasswordForEmail - EXCEPTION:', err);
+      
+      // Check for network errors
+      const errorMessage = err?.message || '';
+      const isNetworkError = errorMessage.includes('Failed to fetch') ||
+                            errorMessage.includes('ERR_NAME_NOT_RESOLVED') ||
+                            errorMessage.includes('ERR_NETWORK') ||
+                            errorMessage.includes('network') ||
+                            err.name === 'TypeError';
+      
+      if (isNetworkError) {
+        console.error('[ResetPassword] Network error in exception - clearing health cache');
+        clearHealthCheckCache();
+        setError('Cannot connect to Supabase. It may be paused, offline, or there is a network issue. Please try again.');
+      } else {
+        setError(err.message || "An error occurred. Please try again.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -98,7 +172,23 @@ export default function ResetPasswordPage() {
 
                 {error && (
                   <div className="bg-red-50 border-2 border-red-500 rounded-xl p-4">
-                    <p className="text-red-600 text-sm text-center">{error}</p>
+                    <p className="text-red-600 text-sm text-center mb-3">{error}</p>
+                    {(error.includes('unavailable') || error.includes('Cannot connect') || error.includes('network')) && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setIsRetrying(true);
+                          clearHealthCheckCache();
+                          const syntheticEvent = { preventDefault: () => {} } as React.FormEvent;
+                          await handleSubmit(syntheticEvent);
+                          setIsRetrying(false);
+                        }}
+                        disabled={isRetrying || isLoading}
+                        className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-semibold"
+                      >
+                        {isRetrying ? "Retrying..." : "Retry"}
+                      </button>
+                    )}
                   </div>
                 )}
 

@@ -131,6 +131,9 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
       }
 
       // Insert post into Supabase
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/7c97e237-f692-44e7-a6d1-13f83ea50b12',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CreatePost.tsx:133',message:'About to insert post',data:{userId,contentLength:content.trim().length,hasImage:!!imageUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       const { data, error: insertError } = await supabase
         .from('posts')
         .insert({
@@ -142,6 +145,9 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
         .single();
 
       if (insertError) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/7c97e237-f692-44e7-a6d1-13f83ea50b12',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CreatePost.tsx:144',message:'Post insert error',data:{message:insertError.message,code:insertError.code,details:insertError.details,hint:insertError.hint,status:(insertError as any).status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
         console.error("=== CREATE POST ERROR ===");
         console.error("Full error:", insertError);
         console.error("Error message:", insertError.message);
@@ -150,6 +156,9 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
         console.error("Error code:", insertError.code);
         throw insertError;
       }
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/7c97e237-f692-44e7-a6d1-13f83ea50b12',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CreatePost.tsx:152',message:'Post inserted successfully',data:{postId:data?.id,postIdType:typeof data?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
 
       console.log("Post created successfully:", data);
 

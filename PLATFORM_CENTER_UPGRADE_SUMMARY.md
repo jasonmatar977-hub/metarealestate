@@ -308,3 +308,7 @@ If you want to enable full OpenAI integration:
 
 All changes are frontend-only and non-destructive. The platform now centers around Area Journal while maintaining all existing functionality.
 
+
+
+
+

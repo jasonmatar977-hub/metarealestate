@@ -288,12 +288,29 @@ export default function ChatPage() {
   const setupRealtimeSubscription = useCallback(() => {
     if (!conversationId) return;
     
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/7c97e237-f692-44e7-a6d1-13f83ea50b12',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatPage.tsx:288',message:'setupRealtimeSubscription called',data:{conversationId,hasExistingSubscription:!!subscriptionRef.current,isSettingUp:isSettingUpSubscriptionRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
+    
     // Clean up existing subscription
     if (subscriptionRef.current) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/7c97e237-f692-44e7-a6d1-13f83ea50b12',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatPage.tsx:293',message:'Unsubscribing existing channel',data:{conversationId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
       console.log("[Chat] Unsubscribing from existing channel");
       subscriptionRef.current.unsubscribe();
       subscriptionRef.current = null;
     }
+    
+    // Guard: Don't set up if already setting up (React Strict Mode double mount)
+    if (isSettingUpSubscriptionRef.current) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/7c97e237-f692-44e7-a6d1-13f83ea50b12',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatPage.tsx:300',message:'Skipping duplicate subscription setup',data:{conversationId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
+      console.log("[Chat] Already setting up subscription, skipping duplicate");
+      return;
+    }
+    isSettingUpSubscriptionRef.current = true;
     
     console.log("[Chat] Setting up realtime subscription for conversation:", conversationId);
     
@@ -377,6 +394,9 @@ export default function ChatPage() {
 
     subscriptionRef.current = channel;
     isSettingUpSubscriptionRef.current = false; // Reset guard after setup
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/7c97e237-f692-44e7-a6d1-13f83ea50b12',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatPage.tsx:378',message:'Realtime subscription setup complete',data:{conversationId,channelName:`messages:${conversationId}`},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
   }, [conversationId, user?.id]);
 
   // Load conversation data when component mounts or user/conversation changes
@@ -396,11 +416,22 @@ export default function ChatPage() {
     setupRealtimeSubscription();
 
     return () => {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/7c97e237-f692-44e7-a6d1-13f83ea50b12',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatPage.tsx:418',message:'ChatPage cleanup',data:{conversationId,hasSubscription:!!subscriptionRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
       // Cleanup subscription on unmount
       if (subscriptionRef.current) {
-        subscriptionRef.current.unsubscribe();
+        try {
+          subscriptionRef.current.unsubscribe();
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/7c97e237-f692-44e7-a6d1-13f83ea50b12',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatPage.tsx:424',message:'Subscription unsubscribed in cleanup',data:{conversationId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+          // #endregion
+        } catch (e) {
+          console.warn("[Chat] Error unsubscribing on cleanup:", e);
+        }
         subscriptionRef.current = null;
       }
+      isSettingUpSubscriptionRef.current = false; // Reset guard
       hasLoadedRef.current = false;
       loadingRef.current = false;
     };

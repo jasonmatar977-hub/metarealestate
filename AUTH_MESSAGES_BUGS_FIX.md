@@ -283,3 +283,7 @@ http://localhost:3001
 - Verify Supabase environment variables are set
 - Check if session exists in localStorage (DevTools → Application)
 
+
+
+
+

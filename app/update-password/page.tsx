@@ -13,6 +13,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import Navbar from "@/components/Navbar";
+import { checkSupabaseHealth, clearHealthCheckCache } from "@/lib/supabaseHealth";
 
 function UpdatePasswordForm() {
   const router = useRouter();
@@ -24,10 +25,17 @@ function UpdatePasswordForm() {
   const [success, setSuccess] = useState(false);
   const [isValidSession, setIsValidSession] = useState(false);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const [isRetrying, setIsRetrying] = useState(false);
 
   useEffect(() => {
     // Handle password reset recovery token from URL
     const handleRecovery = async () => {
+      // DEBUG: Log initial state
+      console.log('[UpdatePassword] handleRecovery - Starting:', {
+        hash: window.location.hash?.substring(0, 50) + '...',
+        search: window.location.search,
+      });
+      
       try {
         setIsCheckingSession(true);
         
@@ -50,6 +58,15 @@ function UpdatePasswordForm() {
         // Check if this is a recovery flow
         if ((hashType === 'recovery' || queryType === 'recovery') && accessToken) {
           console.log('[UpdatePassword] Recovery token detected, establishing session...');
+          
+          // DEBUG: Log token details (safe - no secrets)
+          console.log('[UpdatePassword] Recovery token details:', {
+            hashType,
+            queryType,
+            hasAccessToken: !!accessToken,
+            hasRefreshToken: !!refreshToken,
+            accessTokenLength: accessToken?.length,
+          });
           
           // Supabase should automatically handle the hash, but we can also manually set the session
           // First, try to get the current session (Supabase may have already processed the hash)
@@ -136,7 +153,19 @@ function UpdatePasswordForm() {
     }
 
     setIsLoading(true);
+    setError(null);
+    setSuccess(false);
+    
     try {
+      // Check Supabase health first
+      const healthCheck = await checkSupabaseHealth();
+      if (!healthCheck.isOnline) {
+        console.error('[UpdatePassword] Supabase offline:', healthCheck.error);
+        setIsLoading(false);
+        setError(healthCheck.error || 'Supabase is currently unavailable. Please try again later.');
+        return;
+      }
+      
       // Verify we still have a valid session
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
@@ -150,10 +179,32 @@ function UpdatePasswordForm() {
       const { error: updateError } = await supabase.auth.updateUser({
         password: password,
       });
+      
+      // DEBUG: Log update result
+      console.log('[UpdatePassword] updateUser - Result:', {
+        hasError: !!updateError,
+        errorMessage: updateError?.message,
+        errorCode: (updateError as any)?.code,
+      });
 
       if (updateError) {
         console.error('[UpdatePassword] Error updating password:', updateError);
-        setError(updateError.message || "Failed to update password. Please try again.");
+        
+        // Check for network errors
+        const errorMessage = updateError.message || '';
+        const isNetworkError = errorMessage.includes('Failed to fetch') ||
+                              errorMessage.includes('ERR_NAME_NOT_RESOLVED') ||
+                              errorMessage.includes('ERR_NETWORK') ||
+                              errorMessage.includes('network') ||
+                              (updateError as any).name === 'TypeError';
+        
+        if (isNetworkError) {
+          console.error('[UpdatePassword] Network error - clearing health cache');
+          clearHealthCheckCache();
+          setError('Cannot connect to Supabase. It may be paused, offline, or there is a network issue. Please try again.');
+        } else {
+          setError(updateError.message || "Failed to update password. Please try again.");
+        }
       } else {
         setSuccess(true);
         // Redirect to login with success message after 2 seconds
@@ -163,7 +214,22 @@ function UpdatePasswordForm() {
       }
     } catch (err: any) {
       console.error('[UpdatePassword] Exception updating password:', err);
-      setError(err.message || "An error occurred. Please try again.");
+      
+      // Check for network errors
+      const errorMessage = err?.message || '';
+      const isNetworkError = errorMessage.includes('Failed to fetch') ||
+                            errorMessage.includes('ERR_NAME_NOT_RESOLVED') ||
+                            errorMessage.includes('ERR_NETWORK') ||
+                            errorMessage.includes('network') ||
+                            err.name === 'TypeError';
+      
+      if (isNetworkError) {
+        console.error('[UpdatePassword] Network error in exception - clearing health cache');
+        clearHealthCheckCache();
+        setError('Cannot connect to Supabase. It may be paused, offline, or there is a network issue. Please try again.');
+      } else {
+        setError(err.message || "An error occurred. Please try again.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -249,7 +315,7 @@ function UpdatePasswordForm() {
 
                 {error && (
                   <div className="bg-red-50 border-2 border-red-500 rounded-xl p-4">
-                    <p className="text-red-600 text-sm text-center">{error}</p>
+                    <p className="text-red-600 text-sm text-center mb-3">{error}</p>
                     {error.includes("expired") && (
                       <Link
                         href="/reset-password"
@@ -257,6 +323,22 @@ function UpdatePasswordForm() {
                       >
                         Request a new reset link
                       </Link>
+                    )}
+                    {(error.includes('unavailable') || error.includes('Cannot connect') || error.includes('network')) && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setIsRetrying(true);
+                          clearHealthCheckCache();
+                          const syntheticEvent = { preventDefault: () => {} } as React.FormEvent;
+                          await handleSubmit(syntheticEvent);
+                          setIsRetrying(false);
+                        }}
+                        disabled={isRetrying || isLoading}
+                        className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-semibold mt-2"
+                      >
+                        {isRetrying ? "Retrying..." : "Retry"}
+                      </button>
                     )}
                   </div>
                 )}

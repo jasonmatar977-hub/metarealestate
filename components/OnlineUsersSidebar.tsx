@@ -6,7 +6,7 @@
  * Shows users I follow (priority) or recent conversations
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
@@ -28,6 +28,7 @@ export default function OnlineUsersSidebar() {
   const router = useRouter();
   const [users, setUsers] = useState<UserWithPresence[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [blockedUserIds, setBlockedUserIds] = useState<Set<string>>(new Set());
 
   // Load blocked users
@@ -56,6 +57,9 @@ export default function OnlineUsersSidebar() {
     loadBlockedUsers();
   }, [user, isAuthenticated]);
 
+  // Load online users function (defined outside useEffect so Retry button can call it)
+  const loadOnlineUsersRef = useRef<(() => Promise<void>) | null>(null);
+
   // Load online users (with timeout and error handling)
   useEffect(() => {
     if (!user || !isAuthenticated) return;
@@ -66,7 +70,11 @@ export default function OnlineUsersSidebar() {
     }, 10000); // 10 second timeout
 
     const loadOnlineUsers = async () => {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/7c97e237-f692-44e7-a6d1-13f83ea50b12',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OnlineUsersSidebar.tsx:68',message:'loadOnlineUsers started',data:{userId:user.id,isAborted:abortController.signal.aborted},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
       setIsLoading(true);
+      setError(null);
       try {
         // Priority 1: Users I follow (with timeout)
         const followsQueryPromise = Promise.resolve(
@@ -83,6 +91,9 @@ export default function OnlineUsersSidebar() {
             setTimeout(() => reject({ data: null, error: { message: 'Query timed out' } }), 8000)
           )
         ]).catch((error) => {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/7c97e237-f692-44e7-a6d1-13f83ea50b12',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OnlineUsersSidebar.tsx:85',message:'Follows query timeout',data:{error:error?.error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+          // #endregion
           console.error('[OnlineUsers] Follows query timeout:', error);
           return { data: null, error: { message: 'Query timed out' } };
         });
@@ -90,7 +101,12 @@ export default function OnlineUsersSidebar() {
         const { data: followsData, error: followsError } = followsResult;
 
         if (followsError) {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/7c97e237-f692-44e7-a6d1-13f83ea50b12',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OnlineUsersSidebar.tsx:95',message:'Follows query error',data:{message:followsError.message,code:followsError.code,details:followsError.details},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+          // #endregion
           console.error("[OnlineUsers] Error loading follows:", followsError);
+          setError(followsError.message || "Failed to load users");
+          setIsLoading(false);
           // Fallback to recent conversations
           await loadRecentConversations();
           return;
@@ -165,12 +181,19 @@ export default function OnlineUsersSidebar() {
             });
 
           setUsers(usersWithPresence);
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/7c97e237-f692-44e7-a6d1-13f83ea50b12',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OnlineUsersSidebar.tsx:167',message:'Users loaded successfully',data:{count:usersWithPresence.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+          // #endregion
         } else {
           // No follows, fallback to recent conversations
           await loadRecentConversations();
         }
-      } catch (error) {
+      } catch (error: any) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/7c97e237-f692-44e7-a6d1-13f83ea50b12',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OnlineUsersSidebar.tsx:175',message:'loadOnlineUsers exception',data:{message:error?.message,isAborted:abortController.signal.aborted},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
         console.error("[OnlineUsers] Error in loadOnlineUsers:", error);
+        setError(error?.message || "Failed to load online users");
       } finally {
         setIsLoading(false);
       }
@@ -280,11 +303,18 @@ export default function OnlineUsersSidebar() {
 
     // Refresh every 30 seconds to update online status
     const refreshInterval = setInterval(() => {
-      loadOnlineUsers();
+      if (!abortController.signal.aborted) {
+        loadOnlineUsers();
+      }
     }, 30000);
 
     return () => {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/7c97e237-f692-44e7-a6d1-13f83ea50b12',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OnlineUsersSidebar.tsx:300',message:'OnlineUsersSidebar cleanup',data:{userId:user?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
       clearInterval(refreshInterval);
+      abortController.abort();
+      setIsLoading(false);
     };
   }, [user, isAuthenticated, blockedUserIds]);
 
@@ -357,6 +387,21 @@ export default function OnlineUsersSidebar() {
           <div className="text-center py-8">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gold mx-auto mb-2"></div>
             <p className="text-gray-600 text-xs">{t("common.loading") || "Loading..."}</p>
+          </div>
+        ) : error ? (
+          <div className="text-center py-4">
+            <p className="text-red-500 text-sm mb-2">{error}</p>
+            <button
+              onClick={() => {
+                setError(null);
+                if (loadOnlineUsersRef.current) {
+                  loadOnlineUsersRef.current();
+                }
+              }}
+              className="px-4 py-1 bg-gold text-gray-900 text-xs font-semibold rounded-lg hover:shadow-lg transition-all"
+            >
+              Retry
+            </button>
           </div>
         ) : users.length === 0 ? (
           <div className="text-center py-8">

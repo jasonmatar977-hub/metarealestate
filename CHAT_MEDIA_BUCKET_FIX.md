@@ -257,3 +257,7 @@ The code automatically detects which method works and uses the appropriate one.
 2. Verify path format is correct (no `chat-media/` prefix)
 3. Check Supabase Storage → `chat-media` bucket directly
 
+
+
+
+

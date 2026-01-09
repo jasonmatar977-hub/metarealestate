@@ -240,3 +240,7 @@ if (areaContext && openaiApiKey) {
 
 Choose based on your needs. The current implementation is production-ready and provides excellent results.
 
+
+
+
+

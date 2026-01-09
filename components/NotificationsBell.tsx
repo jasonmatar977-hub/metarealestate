@@ -36,6 +36,7 @@ export default function NotificationsBell() {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const subscriptionRef = useRef<any>(null);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -63,8 +64,14 @@ export default function NotificationsBell() {
 
     return () => {
       // Cleanup subscription
-      const channel = supabase.channel('notifications');
-      channel.unsubscribe();
+      if (subscriptionRef.current) {
+        try {
+          subscriptionRef.current.unsubscribe();
+        } catch (e) {
+          console.warn('[Notifications] Error unsubscribing:', e);
+        }
+        subscriptionRef.current = null;
+      }
     };
   }, [isAuthenticated, user]);
 
@@ -128,8 +135,22 @@ export default function NotificationsBell() {
   const setupRealtimeSubscription = () => {
     if (!user) return;
 
+    // Clean up existing subscription if any
+    if (subscriptionRef.current) {
+      try {
+        subscriptionRef.current.unsubscribe();
+      } catch (e) {
+        console.warn('[Notifications] Error cleaning up old subscription:', e);
+      }
+      subscriptionRef.current = null;
+    }
+
     const channel = supabase
-      .channel(`notifications:${user.id}`)
+      .channel(`notifications:${user.id}`, {
+        config: {
+          broadcast: { self: false },
+        },
+      })
       .on(
         'postgres_changes',
         {
@@ -157,11 +178,11 @@ export default function NotificationsBell() {
           loadNotifications();
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[Notifications] Realtime subscription status:', status);
+      });
 
-    return () => {
-      channel.unsubscribe();
-    };
+    subscriptionRef.current = channel;
   };
 
   const handleNotificationClick = async (notification: Notification) => {

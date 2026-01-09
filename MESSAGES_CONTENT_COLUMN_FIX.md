@@ -188,3 +188,7 @@ After running migration, test these scenarios:
 All should work without "column does not exist" errors.
 
 
+
+
+
+

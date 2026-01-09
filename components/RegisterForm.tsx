@@ -47,7 +47,7 @@ const COUNTRIES = [
 
 export default function RegisterForm() {
   const router = useRouter();
-  const { register } = useAuth();
+  const { register, resendConfirmationEmail } = useAuth();
   const [formData, setFormData] = useState({
     fullName: "",
     username: "",
@@ -59,8 +59,10 @@ export default function RegisterForm() {
     confirmPassword: "",
     agreeToTerms: false,
   });
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [errors, setErrors] = useState<Record<string, string | boolean>>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -141,25 +143,35 @@ export default function RegisterForm() {
 
     setIsLoading(true);
     try {
+      // Normalize email before registration
+      const normalizedEmail = formData.email.trim().toLowerCase();
+      
       // SECURITY: In production, this should call a backend API
       // that validates, sanitizes, and securely stores user data
-      const success = await register({
+      const result = await register({
         fullName: formData.fullName,
         username: formData.username,
-        email: formData.email,
+        email: normalizedEmail,
         address: formData.address,
         country: formData.country,
         birthday: formData.birthday,
         password: formData.password, // Backend must hash this!
       });
-// User must confirm email first, then sign in
-     if (success) {
-  router.push("/login?message=Check your email to confirm your account, then sign in.");
-} else {
-  setErrors({ submit: "Registration failed. Please try again." });
-}
- } catch (error) {
-      setErrors({ submit: "An error occurred. Please try again." });
+
+      if (result.success) {
+        router.push("/listings");
+      } else if (result.needsConfirmation) {
+        // Show email confirmation message
+        setErrors({ 
+          submit: result.error || "Please check your email to confirm your account before logging in.",
+          needsConfirmation: true,
+          email: normalizedEmail
+        });
+      } else {
+        setErrors({ submit: result.error || "Registration failed. Please try again." });
+      }
+    } catch (error: any) {
+      setErrors({ submit: error?.message || "An error occurred. Please try again." });
     } finally {
       setIsLoading(false);
     }
@@ -367,8 +379,59 @@ export default function RegisterForm() {
             </div>
 
             {errors.submit && (
-              <div className="bg-red-50 border-2 border-red-500 rounded-xl p-4">
-                <p className="text-red-600 text-sm text-center">{errors.submit}</p>
+              <div className={`border-2 rounded-xl p-4 ${
+                errors.needsConfirmation 
+                  ? "bg-blue-50 border-blue-500" 
+                  : "bg-red-50 border-red-500"
+              }`}>
+                <p className={`text-sm text-center mb-3 ${
+                  errors.needsConfirmation ? "text-blue-600" : "text-red-600"
+                }`}>
+                  {errors.submit}
+                </p>
+                {!errors.needsConfirmation && typeof errors.submit === 'string' && (errors.submit.includes('unavailable') || errors.submit.includes('Cannot connect') || errors.submit.includes('network')) && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setIsRetrying(true);
+                      setErrors({});
+                      const syntheticEvent = { preventDefault: () => {} } as React.FormEvent;
+                      await handleSubmit(syntheticEvent);
+                      setIsRetrying(false);
+                    }}
+                    disabled={isRetrying || isLoading}
+                    className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-semibold"
+                  >
+                    {isRetrying ? "Retrying..." : "Retry"}
+                  </button>
+                )}
+                {errors.needsConfirmation && errors.email && (
+                  <div className="mt-3 text-center">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setIsResending(true);
+                        const result = await resendConfirmationEmail(errors.email as string);
+                        if (result.success) {
+                          setErrors((prev) => ({
+                            ...prev,
+                            submit: "Confirmation email sent! Please check your inbox.",
+                          }));
+                        } else {
+                          setErrors((prev) => ({
+                            ...prev,
+                            submit: result.error || "Failed to resend email. Please try again.",
+                          }));
+                        }
+                        setIsResending(false);
+                      }}
+                      disabled={isResending}
+                      className="text-sm text-blue-600 hover:text-blue-800 font-semibold underline disabled:opacity-50"
+                    >
+                      {isResending ? "Sending..." : "Resend confirmation email"}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 

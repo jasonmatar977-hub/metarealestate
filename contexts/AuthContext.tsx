@@ -12,6 +12,7 @@ import { supabase } from '@/lib/supabaseClient';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import { safeGetAllKeys, safeRemove } from '@/lib/safeStorage';
 import { normalizeSupabaseError, isAuthError, debugLog } from '@/lib/asyncGuard';
+import { checkSupabaseHealth, clearHealthCheckCache, withSupabaseHealthCheck } from '@/lib/supabaseHealth';
 
 interface User {
   id: string;
@@ -26,9 +27,10 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   loadingSession: boolean; // True while checking initial session
-  login: (email: string, password: string) => Promise<boolean>;
-  register: (userData: RegisterData) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  register: (userData: RegisterData) => Promise<{ success: boolean; needsConfirmation?: boolean; error?: string }>;
   logout: () => Promise<void>;
+  resendConfirmationEmail: (email: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 interface RegisterData {
@@ -53,6 +55,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const authSubscriptionRef = useRef<{ unsubscribe: () => void } | null>(null);
   const isInitializedRef = useRef(false);
   const isMountedRef = useRef(true);
+  
+  // Helper to safely unsubscribe
+  const unsubscribeAuth = useCallback(() => {
+    if (authSubscriptionRef.current) {
+      authSubscriptionRef.current.unsubscribe();
+      authSubscriptionRef.current = null;
+    }
+  }, []);
 
   // Load user profile from Supabase
   const loadUserProfile = useCallback(async (supabaseUser: SupabaseUser): Promise<User | null> => {
@@ -165,9 +175,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Step 1: Get initial session - ALWAYS use getSession() to get current session
-    debugLog('[AuthContext] Calling getSession()...');
-    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
+    // Timeout fallback: If session check takes too long, stop loading
+    const timeoutId = setTimeout(() => {
+      if (isMountedRef.current && loadingSession) {
+        debugLog('[AuthContext] Session check timeout - stopping loading');
+        setLoadingSession(false);
+        setIsLoading(false);
+      }
+    }, 10000); // 10 second timeout
+
+    // Step 1: Check Supabase health before getting session
+    checkSupabaseHealth().then(async (health) => {
+      if (!health.isOnline) {
+        console.warn('[AuthContext] Supabase offline during session check:', health.error);
+        clearTimeout(timeoutId);
+        if (isMountedRef.current) {
+          setIsAuthenticated(false);
+          setUser(null);
+          setLoadingSession(false);
+          setIsLoading(false);
+        }
+        return null;
+      }
+      
+      // Step 2: Get initial session - ALWAYS use getSession() to get current session
+      debugLog('[AuthContext] Calling getSession()...');
+      return supabase.auth.getSession();
+    }).then(async (result) => {
+      if (!result) return; // Health check failed, already handled
+      
+      const { data: { session }, error } = result;
+      clearTimeout(timeoutId);
       if (!isMountedRef.current) return;
 
       debugLog('[AuthContext] getSession result:', { 
@@ -234,8 +272,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       debugLog('[AuthContext] Session validated successfully');
       updateUserFromSession(session);
     }).catch((error) => {
+      clearTimeout(timeoutId);
       const normalized = normalizeSupabaseError(error);
       debugLog("[AuthContext] Exception getting session:", normalized);
+      
+      // Check for network errors
+      const errorMessage = error?.message || '';
+      const isNetworkError = errorMessage.includes('Failed to fetch') ||
+                            errorMessage.includes('ERR_NAME_NOT_RESOLVED') ||
+                            errorMessage.includes('ERR_NETWORK') ||
+                            errorMessage.includes('network') ||
+                            error.name === 'TypeError';
+      
+      if (isNetworkError) {
+        console.error('[AuthContext] Network error in session check - clearing health cache');
+        clearHealthCheckCache();
+      }
+      
       if (isMountedRef.current) {
         setLoadingSession(false);
         setIsLoading(false);
@@ -244,12 +297,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
+    return () => {
+      clearTimeout(timeoutId);
+    };
+
     // Step 2: Listen for auth changes - this keeps state in sync
     // Only set up subscription once
-    if (authSubscriptionRef.current) {
-      debugLog('[AuthContext] Subscription already exists, cleaning up old one');
-      authSubscriptionRef.current.unsubscribe();
-    }
+    unsubscribeAuth();
     
     debugLog('[AuthContext] Setting up onAuthStateChange listener...');
     const {
@@ -289,13 +343,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       debugLog('[AuthContext] Cleaning up...');
       isMountedRef.current = false;
-      if (authSubscriptionRef.current) {
-        authSubscriptionRef.current.unsubscribe();
-        authSubscriptionRef.current = null;
-      }
+      unsubscribeAuth();
       isInitializedRef.current = false;
     };
-  }, [updateUserFromSession, handleSessionHealthCheck]);
+  }, [updateUserFromSession, handleSessionHealthCheck, unsubscribeAuth]);
 
   /**
    * Clean up stale auth keys from storage (safe storage with fallback)
@@ -331,15 +382,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * Login with email and password using Supabase
    * Always uses getSession() after signIn to ensure we have the latest session
    * CRITICAL: Clears any stale session before attempting login
+   * Normalizes email (trim + lowercase)
    */
-  const login = useCallback(async (email: string, password: string): Promise<boolean> => {
+  const login = useCallback(async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
       debugLog('[AuthContext] signIn start');
       setIsLoading(true);
       
+      // Normalize email: trim and lowercase
+      const normalizedEmail = email.trim().toLowerCase();
+      
       // Clear any stale state first
       setIsAuthenticated(false);
       setUser(null);
+      
+      // Check Supabase health before attempting login
+      const healthCheck = await checkSupabaseHealth();
+      if (!healthCheck.isOnline) {
+        console.error('[AuthContext] Login blocked - Supabase offline:', healthCheck.error);
+        setIsLoading(false);
+        return { success: false, error: healthCheck.error || 'Supabase is currently unavailable. Please try again later.' };
+      }
       
       // CRITICAL FIX: Clear any existing stale session before attempting login
       // This prevents "Invalid email or password" errors when a stale session exists
@@ -353,14 +416,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       // Now attempt login with fresh state
       debugLog('[AuthContext] Attempting signInWithPassword...');
+      
+      // DEBUG: Log before signIn
+      console.log('[AuthContext] signInWithPassword - Before call:', {
+        email: normalizedEmail,
+        hasPassword: !!password,
+        supabaseUrl: typeof window !== 'undefined' ? (process.env.NEXT_PUBLIC_SUPABASE_URL?.substring(0, 30) + '...') : 'SSR',
+        supabaseKeySet: typeof window !== 'undefined' ? !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY : false,
+      });
+      
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: normalizedEmail,
         password,
       });
 
       if (error) {
+        // DEBUG: Log full error details
+        console.error('[AuthContext] signInWithPassword - ERROR:', {
+          message: error.message,
+          status: error.status,
+          name: error.name,
+          code: (error as any).code,
+          details: (error as any).details,
+          hint: (error as any).hint,
+          isNetworkError: error.message?.includes('fetch') || error.message?.includes('network'),
+        });
+        
         const normalized = normalizeSupabaseError(error);
         debugLog('[AuthContext] signIn error:', normalized);
+        
+        // Check for network errors
+        const errorMessage = error.message || '';
+        const isNetworkError = errorMessage.includes('Failed to fetch') ||
+                              errorMessage.includes('ERR_NAME_NOT_RESOLVED') ||
+                              errorMessage.includes('ERR_NETWORK') ||
+                              errorMessage.includes('network') ||
+                              error.name === 'TypeError';
+        
+        if (isNetworkError) {
+          console.error('[AuthContext] Network error detected - clearing health cache');
+          clearHealthCheckCache();
+          setIsLoading(false);
+          return { 
+            success: false, 
+            error: 'Cannot connect to Supabase. It may be paused, offline, or there is a network issue. Please try again.' 
+          };
+        }
         
         // Log full error details for debugging (dev mode)
         console.error('[AuthContext] Login failed - Full error details:', {
@@ -381,12 +482,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Always clear state on error
         setIsAuthenticated(false);
         setUser(null);
-        return false;
+        setIsLoading(false);
+        return { success: false, error: error.message || 'Invalid email or password. Please try again.' };
       }
 
       // After successful signIn, always get the current session
       // This ensures we have the latest session data
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      // DEBUG: Log session result
+      console.log('[AuthContext] signInWithPassword - After getSession:', {
+        hasSession: !!session,
+        hasUser: !!session?.user,
+        userId: session?.user?.id,
+        sessionError: sessionError?.message,
+      });
       
       if (sessionError || !session?.user) {
         const normalized = normalizeSupabaseError(sessionError);
@@ -398,7 +508,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         
         setIsAuthenticated(false);
         setUser(null);
-        return false;
+        setIsLoading(false);
+        return { success: false, error: sessionError?.message || 'Failed to get session after login. Please try again.' };
       }
 
       // Load user profile from the session
@@ -407,21 +518,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         debugLog('[AuthContext] Profile loaded, setting user state');
         setIsAuthenticated(true);
         setUser(userData);
-        return true;
+        setIsLoading(false);
+        return { success: true };
       } else {
         debugLog('[AuthContext] Failed to load user profile');
         setIsAuthenticated(false);
         setUser(null);
-        return false;
+        setIsLoading(false);
+        return { success: false, error: 'Failed to load user profile. Please try again.' };
       }
     } catch (error: any) {
       const normalized = normalizeSupabaseError(error);
       debugLog('[AuthContext] Login exception:', normalized);
       
+      // Check for network errors
+      const errorMessage = error?.message || '';
+      const isNetworkError = errorMessage.includes('Failed to fetch') ||
+                            errorMessage.includes('ERR_NAME_NOT_RESOLVED') ||
+                            errorMessage.includes('ERR_NETWORK') ||
+                            errorMessage.includes('network') ||
+                            error.name === 'TypeError';
+      
+      if (isNetworkError) {
+        console.error('[AuthContext] Network error in login - clearing health cache');
+        clearHealthCheckCache();
+        setIsLoading(false);
+        return { 
+          success: false, 
+          error: 'Cannot connect to Supabase. It may be paused, offline, or there is a network issue. Please try again.' 
+        };
+      }
+      
       // Always clear state on exception
       setIsAuthenticated(false);
       setUser(null);
-      return false;
+      setIsLoading(false);
+      return { success: false, error: error?.message || 'An error occurred. Please try again.' };
     } finally {
       // ALWAYS reset loading state - this is critical
       debugLog('[AuthContext] isLoading reset in finally');
@@ -431,17 +563,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   /**
    * Register new user with Supabase
+   * CRITICAL: Always sets loading=false in finally block
+   * Normalizes email (trim + lowercase)
    * Email confirmation ON (most common)
    * Do NOT set isAuthenticated=true unless we receive a session
    */
-  const register = async (userData: RegisterData): Promise<boolean> => {
+  const register = async (userData: RegisterData): Promise<{ success: boolean; needsConfirmation?: boolean; error?: string }> => {
     try {
       setIsLoading(true);
-
+      
+      // Normalize email: trim and lowercase
+      const normalizedEmail = userData.email.trim().toLowerCase();
+      
+      // Check Supabase health before attempting signup
+      const healthCheck = await checkSupabaseHealth();
+      if (!healthCheck.isOnline) {
+        console.error('[AuthContext] Signup blocked - Supabase offline:', healthCheck.error);
+        setIsLoading(false);
+        return { success: false, error: healthCheck.error || 'Supabase is currently unavailable. Please try again later.' };
+      }
+      
       const { data, error } = await supabase.auth.signUp({
-        email: userData.email,
+        email: normalizedEmail,
         password: userData.password,
         options: {
+          emailRedirectTo: typeof window !== 'undefined'
+            ? `${window.location.origin}/login?confirmed=true`
+            : undefined,
           data: {
             full_name: userData.fullName,
             username: userData.username,
@@ -449,38 +597,116 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         },
       });
 
+      // DEBUG: Log signup result
+      console.log('[AuthContext] signUp result:', {
+        hasUser: !!data.user,
+        userEmail: data.user?.email,
+        emailConfirmed: !!data.user?.email_confirmed_at,
+        hasError: !!error,
+        errorMessage: error?.message,
+        errorCode: (error as any)?.code,
+        errorStatus: (error as any)?.status,
+      });
+
       if (error) {
-        console.error("[AuthContext] Registration error:", error);
+        const normalized = normalizeSupabaseError(error);
+        debugLog('[AuthContext] Registration error:', normalized);
+        console.error('[AuthContext] Registration error details:', {
+          message: error.message,
+          code: (error as any).code,
+          details: (error as any).details,
+          hint: (error as any).hint,
+        });
+        
+        // Check for network errors
+        const errorMessage = error.message || '';
+        const isNetworkError = errorMessage.includes('Failed to fetch') ||
+                              errorMessage.includes('ERR_NAME_NOT_RESOLVED') ||
+                              errorMessage.includes('ERR_NETWORK') ||
+                              errorMessage.includes('network') ||
+                              (error as any).name === 'TypeError';
+        
+        if (isNetworkError) {
+          console.error('[AuthContext] Network error in signup - clearing health cache');
+          clearHealthCheckCache();
+          setIsLoading(false);
+          return { 
+            success: false, 
+            error: 'Cannot connect to Supabase. It may be paused, offline, or there is a network issue. Please try again.' 
+          };
+        }
+        
         setIsAuthenticated(false);
         setUser(null);
-        return false;
+        setIsLoading(false);
+        return { success: false, error: error.message || 'Registration failed' };
       }
 
-      //  IMPORTANT:
-      // If Email Confirmation is enabled in Supabase,
-      // signUp succeeds but data.session is NULL until user confirms email.
-      if (!data.session) {
+      // Check if email confirmation is required
+      // If user is null but no error, it means email confirmation is required
+      if (!data.user && !error) {
+        debugLog('[AuthContext] Email confirmation required');
         setIsAuthenticated(false);
         setUser(null);
-        return true; // registration success, but NOT logged in yet
+        setIsLoading(false);
+        return { success: false, needsConfirmation: true, error: 'Please check your email to confirm your account' };
       }
 
-      //  If session exists, user is logged in immediately
-      const userProfile = await loadUserProfile(data.session.user);
-      if (userProfile) {
-        setIsAuthenticated(true);
-        setUser(userProfile);
-        return true;
+      if (data.user) {
+        // Check if user email is confirmed
+        if (!data.user.email_confirmed_at) {
+          debugLog('[AuthContext] User created but email not confirmed');
+          setIsAuthenticated(false);
+          setUser(null);
+          setIsLoading(false);
+          return { success: false, needsConfirmation: true, error: 'Please check your email to confirm your account' };
+        }
+
+        // Profile will be created automatically by trigger
+        // But we can update it with additional info if needed
+        const userProfile = await loadUserProfile(data.user);
+        if (userProfile) {
+          setIsAuthenticated(true);
+          setUser(userProfile);
+          setIsLoading(false);
+          return { success: true };
+        }
       }
 
       setIsAuthenticated(false);
       setUser(null);
-      return false;
-    } catch (err: any) {
-      console.error("[AuthContext] Registration exception:", err);
+      setIsLoading(false);
+      return { success: false, error: 'Registration failed' };
+    } catch (error: any) {
+      const normalized = normalizeSupabaseError(error);
+      debugLog('[AuthContext] Registration exception:', normalized);
+      console.error('[AuthContext] Registration exception details:', {
+        message: error?.message,
+        error,
+      });
+      
+      // Check for network errors
+      const errorMessage = error?.message || '';
+      const isNetworkError = errorMessage.includes('Failed to fetch') ||
+                            errorMessage.includes('ERR_NAME_NOT_RESOLVED') ||
+                            errorMessage.includes('ERR_NETWORK') ||
+                            errorMessage.includes('network') ||
+                            error.name === 'TypeError';
+      
+      if (isNetworkError) {
+        console.error('[AuthContext] Network error in registration exception - clearing health cache');
+        clearHealthCheckCache();
+        setIsLoading(false);
+        return { 
+          success: false, 
+          error: 'Cannot connect to Supabase. It may be paused, offline, or there is a network issue. Please try again.' 
+        };
+      }
+      
       setIsAuthenticated(false);
       setUser(null);
-      return false;
+      setIsLoading(false);
+      return { success: false, error: error?.message || 'Registration failed' };
     } finally {
       setIsLoading(false);
     }
@@ -570,8 +796,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  /**
+   * Resend email confirmation
+   */
+  const resendConfirmationEmail = useCallback(async (email: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const normalizedEmail = email.trim().toLowerCase();
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: normalizedEmail,
+      });
+
+      if (error) {
+        debugLog('[AuthContext] Resend confirmation error:', error);
+        return { success: false, error: error.message || 'Failed to resend confirmation email' };
+      }
+
+      return { success: true };
+    } catch (error: any) {
+      debugLog('[AuthContext] Resend confirmation exception:', error);
+      return { success: false, error: error?.message || 'Failed to resend confirmation email' };
+    }
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ isAuthenticated, user, isLoading, loadingSession, login, register, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, user, isLoading, loadingSession, login, register, logout, resendConfirmationEmail }}>
       {children}
     </AuthContext.Provider>
   );

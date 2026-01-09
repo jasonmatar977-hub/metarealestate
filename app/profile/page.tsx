@@ -217,12 +217,23 @@ export default function ProfilePage() {
     return userId.slice(0, 2).toUpperCase() || 'U';
   };
 
+  // Timeout fallback for loading state
+  useEffect(() => {
+    if (authLoading || isLoading) {
+      const timeoutId = setTimeout(() => {
+        setIsLoading(false);
+      }, 10000); // 10 second timeout
+      return () => clearTimeout(timeoutId);
+    }
+  }, [authLoading, isLoading]);
+
   if (authLoading || isLoading) {
     return (
       <main className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gold mx-auto mb-4"></div>
           <p className="text-gray-600">Loading profile...</p>
+          <p className="text-xs text-gray-400 mt-2">If this takes too long, please refresh the page</p>
         </div>
       </main>
     );

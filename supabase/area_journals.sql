@@ -311,3 +311,7 @@ GRANT SELECT ON area_journals TO authenticated;
 GRANT SELECT ON area_journal_updates TO authenticated;
 GRANT SELECT ON area_journal_contributions TO authenticated;
 
+
+
+
+

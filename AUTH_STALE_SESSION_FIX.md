@@ -285,3 +285,7 @@ If issues persist:
 3. Check network tab for 401 responses
 4. Verify session expiration time in Supabase dashboard
 
+
+
+
+

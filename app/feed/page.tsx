@@ -302,6 +302,17 @@ export default function FeedPage() {
     }
   };
 
+  // Timeout fallback for loading state
+  useEffect(() => {
+    if (loadingSession || isLoading) {
+      const timeoutId = setTimeout(() => {
+        // Timeout handled by AuthContext, but log for debugging
+        console.warn('[FeedPage] Loading timeout - AuthContext should have stopped loading');
+      }, 10000); // 10 second timeout
+      return () => clearTimeout(timeoutId);
+    }
+  }, [loadingSession, isLoading]);
+
   // Show loading state while checking auth or initial session
   if (loadingSession || isLoading) {
     return (
@@ -309,6 +320,7 @@ export default function FeedPage() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gold mx-auto mb-4"></div>
           <p className="text-gray-600">Loading...</p>
+          <p className="text-xs text-gray-400 mt-2">If this takes too long, please refresh the page</p>
         </div>
       </main>
     );

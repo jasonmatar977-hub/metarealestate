@@ -312,3 +312,7 @@ USING (bucket_id = 'chat-media');
 9. **Text with attachment:** Both sent together
 10. **Realtime race condition:** Optimistic update + realtime handled correctly
 
+
+
+
+

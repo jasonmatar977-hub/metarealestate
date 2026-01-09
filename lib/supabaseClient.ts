@@ -72,8 +72,10 @@ function createSafeStorageAdapter() {
 
 // Read environment variables directly (NEXT_PUBLIC_ vars are available in both SSR and client)
 // Next.js automatically makes NEXT_PUBLIC_* variables available at build time and runtime
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+// These are replaced at build time, so they're available as literal strings in the browser
+// Access via process.env (which Next.js polyfills for NEXT_PUBLIC_ vars in the browser)
+const supabaseUrl = (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_SUPABASE_URL) || '';
+const supabaseAnonKey = (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_SUPABASE_ANON_KEY) || '';
 
 // Validate environment variables
 const isValidUrl = supabaseUrl && supabaseUrl.startsWith('https://') && !supabaseUrl.includes('placeholder');
@@ -82,6 +84,7 @@ const isValidKey = supabaseAnonKey && supabaseAnonKey.length > 20 && !supabaseAn
 // Debug log in development (don't print full key)
 if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   console.log('[Supabase Client] Environment check:', {
+    timestamp: new Date().toISOString(),
     urlSet: !!supabaseUrl,
     urlLength: supabaseUrl?.length || 0,
     urlValid: isValidUrl,
@@ -115,6 +118,16 @@ export const supabase = createClient(
   }
 );
 
+// DEBUG: Log client initialization
+if (typeof window !== 'undefined') {
+  console.log('[Supabase Client] Initialized:', {
+    timestamp: new Date().toISOString(),
+    urlValid: isValidUrl,
+    keyValid: isValidKey,
+    urlPreview: isValidUrl ? supabaseUrl.substring(0, 30) + '...' : 'INVALID',
+  });
+}
+
 // Global 401 handler: Automatically sign out on invalid token errors
 // This catches expired/invalid sessions from any Supabase request
 if (typeof window !== 'undefined' && isValidUrl && isValidKey) {
@@ -131,7 +144,11 @@ if (typeof window !== 'undefined' && isValidUrl && isValidKey) {
     const isSupabaseRequest = url.includes('supabase') || 
                               url.includes(supabaseUrl?.substring(0, 30) || '');
     
-    if (isSupabaseRequest && response.status === 401 && !isHandling401) {
+    // Skip 401 handling for health check requests (they may return 401 but shouldn't clear auth)
+    const isHealthCheckRequest = url.includes('/rest/v1/profiles?select=id&limit=1') || 
+                                 url.includes('/rest/v1/');
+    
+    if (isSupabaseRequest && !isHealthCheckRequest && response.status === 401 && !isHandling401) {
       isHandling401 = true;
       console.warn('[Supabase] 401 Unauthorized detected - session expired');
       
@@ -201,25 +218,43 @@ export const getSupabaseConfigError = (): string | null => {
   // Only check on client-side - this prevents SSR from showing config errors
   if (typeof window === 'undefined') return null;
   
-  // Re-read env vars on client-side to ensure we have the latest values
-  const clientUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-  const clientKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+  // Read NEXT_PUBLIC_ env vars on client-side
+  // These are available in the browser because Next.js injects them at build time
+  const clientUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const clientKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   
-  const clientIsValidUrl = clientUrl && clientUrl.startsWith('https://') && !clientUrl.includes('placeholder');
-  const clientIsValidKey = clientKey && clientKey.length > 20 && !clientKey.includes('placeholder');
+  // Dev-only debug: Log env var presence without printing secrets
+  if (process.env.NODE_ENV === 'development') {
+    console.debug('[Supabase Config Check]', {
+      urlPresent: !!clientUrl,
+      urlLength: clientUrl?.length || 0,
+      urlPreview: clientUrl ? `${clientUrl.substring(0, 20)}...` : 'NOT SET',
+      keyPresent: !!clientKey,
+      keyLength: clientKey?.length || 0,
+      keyPreview: clientKey ? `${clientKey.substring(0, 10)}...` : 'NOT SET',
+    });
+  }
   
-  if (!clientUrl) {
+  // Validate URL
+  if (!clientUrl || typeof clientUrl !== 'string') {
     return 'NEXT_PUBLIC_SUPABASE_URL is not set. Please create .env.local in project root.';
   }
+  
+  const clientIsValidUrl = clientUrl.startsWith('https://') && !clientUrl.includes('placeholder');
   if (!clientIsValidUrl) {
-    return 'NEXT_PUBLIC_SUPABASE_URL is invalid. Must start with https://';
+    return 'NEXT_PUBLIC_SUPABASE_URL is invalid. Must start with https:// and not be a placeholder.';
   }
-  if (!clientKey) {
+  
+  // Validate Key
+  if (!clientKey || typeof clientKey !== 'string') {
     return 'NEXT_PUBLIC_SUPABASE_ANON_KEY is not set. Please create .env.local in project root.';
   }
+  
+  const clientIsValidKey = clientKey.length > 20 && !clientKey.includes('placeholder');
   if (!clientIsValidKey) {
-    return 'NEXT_PUBLIC_SUPABASE_ANON_KEY is invalid.';
+    return 'NEXT_PUBLIC_SUPABASE_ANON_KEY is invalid. Must be at least 20 characters and not be a placeholder.';
   }
+  
   return null;
 };
 

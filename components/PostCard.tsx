@@ -53,18 +53,6 @@ export default function PostCard({
   
   // Check if current user is the post owner
   const isPostOwner = user?.id === userId;
-  
-  // DEBUG: Log ownership check
-  console.log(`[PostCard ${postId}] DEBUG:`, {
-    importPath: '@/components/PostCard',
-    currentUserId: user?.id,
-    postUserId: userId,
-    isOwner: isPostOwner,
-    userExists: !!user,
-    userIdExists: !!userId,
-    userIdType: typeof userId,
-    currentUserIdType: typeof user?.id
-  });
 
   const handleLike = async () => {
     if (!user || isLiking) return;
@@ -238,13 +226,6 @@ export default function PostCard({
     }
   };
 
-  // DEBUG: Log render state
-  console.log(`[PostCard ${postId}] RENDER:`, {
-    isPostOwner,
-    showDeleteMenu,
-    isDeleting,
-    willRenderButton: isPostOwner
-  });
 
   return (
     <div className="glass-dark rounded-2xl shadow-lg" style={{ overflow: 'visible' }}>
@@ -257,17 +238,15 @@ export default function PostCard({
           <h3 className="font-bold text-gray-900 truncate">{username}</h3>
           <p className="text-sm text-gray-500">{timestamp}</p>
         </div>
-        {/* Delete Button - Only show for post owner - ALWAYS VISIBLE FOR DEBUG */}
-        {isPostOwner ? (
+        {/* Delete Button - Only show for post owner */}
+        {isPostOwner && (
           <div className="relative flex-shrink-0" style={{ zIndex: 50 }}>
-            {/* Always visible delete button (removed hidden/sm:flex) */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                console.log(`[PostCard ${postId}] Delete button clicked`);
                 setShowDeleteMenu(!showDeleteMenu);
               }}
-              className="p-2 hover:bg-gray-100 active:bg-gray-200 rounded-full transition-colors touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center bg-yellow-100 border-2 border-yellow-500"
+              className="p-2 hover:bg-gray-100 active:bg-gray-200 rounded-full transition-colors touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
               aria-label="More options"
               disabled={isDeleting}
               type="button"
@@ -275,30 +254,26 @@ export default function PostCard({
             >
               <span className="text-xl leading-none">⋯</span>
             </button>
-            {/* Dropdown menu - ALWAYS VISIBLE FOR DEBUG */}
+            {/* Dropdown menu */}
             {showDeleteMenu && (
               <>
                 {/* Backdrop to close menu on click outside */}
                 <div
                   className="fixed inset-0 z-40"
-                  onClick={() => {
-                    console.log(`[PostCard ${postId}] Backdrop clicked, closing menu`);
-                    setShowDeleteMenu(false);
-                  }}
+                  onClick={() => setShowDeleteMenu(false)}
                 />
                 {/* Menu dropdown */}
                 <div 
-                  className="absolute right-0 mt-2 w-40 bg-white rounded-lg shadow-xl border-2 border-red-500 z-50"
+                  className="absolute right-0 mt-2 w-40 bg-white rounded-lg shadow-xl border border-gray-200 z-50"
                   style={{ zIndex: 50 }}
                 >
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      console.log(`[PostCard ${postId}] Delete menu item clicked`);
                       handleDelete();
                     }}
                     disabled={isDeleting}
-                    className="w-full text-left px-4 py-3 text-red-600 hover:bg-red-50 active:bg-red-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation flex items-center space-x-2 bg-red-50"
+                    className="w-full text-left px-4 py-3 text-red-600 hover:bg-red-50 active:bg-red-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation flex items-center space-x-2"
                     type="button"
                   >
                     <span>{isDeleting ? "⏳" : "🗑️"}</span>
@@ -307,10 +282,6 @@ export default function PostCard({
                 </div>
               </>
             )}
-          </div>
-        ) : (
-          <div className="text-xs text-gray-400 p-2">
-            DEBUG: Not owner (user: {user?.id?.slice(0, 8)}..., post: {userId?.slice(0, 8)}...)
           </div>
         )}
       </div>

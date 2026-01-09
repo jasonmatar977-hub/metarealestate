@@ -87,6 +87,7 @@ function LoginFormContent() {
   const [isSubmitting, setIsSubmitting] = useState(false); // Separate state for form submission only
   const [checkingSession, setCheckingSession] = useState(true); // Separate state for session check
   const [configError, setConfigError] = useState<string | null>(null);
+  const [isRetrying, setIsRetrying] = useState(false);
   const hasRedirectedRef = useRef(false); // Prevent multiple redirects
 
   // Hard reset all state on mount
@@ -190,26 +191,21 @@ function LoginFormContent() {
         return;
       }
 
+      // Normalize email before login
+      const normalizedEmail = formData.email.trim().toLowerCase();
+      
       // Use AuthContext login function which handles state updates
-      const success = await login(formData.email, formData.password);
+      const result = await login(normalizedEmail, formData.password);
 
-      if (success) {
+      if (result.success) {
         // Success - wait a moment for auth state to update, then redirect
         // Small delay to ensure auth state is updated
         setTimeout(() => {
           router.push("/feed");
         }, 100);
       } else {
-        // Login failed - get actual error from Supabase
-        // The error should already be logged above, but we need to show it to user
-        // Check if we can get more details from the login function
-        const { data: { session }, error: checkError } = await supabase.auth.getSession();
-        if (checkError) {
-          console.error('[LoginForm] Additional error after failed login:', checkError);
-        }
-        
-        // Show actual error message if available, otherwise generic
-        setErrors({ submit: "Invalid email or password. Please try again." });
+        // Login failed - show user-friendly error
+        setErrors({ submit: result.error || "Invalid email or password. Please check your credentials and try again." });
         // Do NOT redirect on error - user should be able to retry
       }
     } catch (error: any) {
@@ -300,7 +296,22 @@ function LoginFormContent() {
 
             {errors.submit && (
               <div className="bg-red-50 border-2 border-red-500 rounded-xl p-4">
-                <p className="text-red-600 text-sm text-center">{errors.submit}</p>
+                <p className="text-red-600 text-sm text-center mb-3">{errors.submit}</p>
+                {(errors.submit.includes('unavailable') || errors.submit.includes('Cannot connect') || errors.submit.includes('network')) && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setIsRetrying(true);
+                      setErrors({});
+                      await handleSubmit({ preventDefault: () => {} } as any);
+                      setIsRetrying(false);
+                    }}
+                    disabled={isRetrying || isSubmitting}
+                    className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-semibold"
+                  >
+                    {isRetrying ? "Retrying..." : "Retry"}
+                  </button>
+                )}
               </div>
             )}
 
