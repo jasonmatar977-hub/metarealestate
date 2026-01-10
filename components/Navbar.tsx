@@ -17,7 +17,7 @@ import NotificationsBell from "@/components/NotificationsBell";
 import { useUnreadMessages } from "@/hooks/useUnreadMessages";
 
 export default function Navbar() {
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, logout, user } = useAuth();
   const { t } = useLanguage();
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -64,25 +64,27 @@ export default function Navbar() {
               <>
                 <Link
                   href="/listings"
-                  className="px-4 py-2 text-gray-700 hover:text-gold transition-colors font-semibold"
+                  className="px-2 md:px-4 py-2 text-gray-700 hover:text-gold transition-colors font-semibold text-sm md:text-base"
                 >
-                  {t('navbar.listings')}
+                  <span className="hidden sm:inline">{t('navbar.listings')}</span>
+                  <span className="sm:hidden">List</span>
                 </Link>
                 <Link
                   href="/feed"
-                  className="px-4 py-2 text-gray-700 hover:text-gold transition-colors font-semibold"
+                  className="px-2 md:px-4 py-2 text-gray-700 hover:text-gold transition-colors font-semibold text-sm md:text-base"
                 >
                   {t('navbar.feed')}
                 </Link>
                 <Link
                   href="/journal"
-                  className="px-4 py-2 text-gray-700 hover:text-gold transition-colors font-semibold"
+                  className="px-2 md:px-4 py-2 text-gray-700 hover:text-gold transition-colors font-semibold text-sm md:text-base"
                 >
-                  {t('navbar.journal')}
+                  <span className="hidden sm:inline">{t('navbar.journal')}</span>
+                  <span className="sm:hidden">Journal</span>
                 </Link>
                 <Link
                   href="/search"
-                  className="px-4 py-2 text-gray-700 hover:text-gold transition-colors font-semibold"
+                  className="px-2 md:px-4 py-2 text-gray-700 hover:text-gold transition-colors font-semibold"
                   title="Search Users"
                 >
                   <svg
@@ -98,22 +100,28 @@ export default function Navbar() {
                   </svg>
                 </Link>
                 <Link
-                  href="/chat"
-                  className="px-4 py-2 text-gray-700 hover:text-gold transition-colors font-semibold"
-                >
-                  {t('navbar.chat')}
-                </Link>
-                <Link
                   href="/messages"
-                  className="px-4 py-2 text-gray-700 hover:text-gold transition-colors font-semibold relative"
+                  className="px-2 md:px-4 py-2 text-gray-700 hover:text-gold transition-colors font-semibold relative text-sm md:text-base"
                 >
-                  {t('navbar.messages')}
+                  <span className="hidden sm:inline">Messages</span>
+                  <span className="sm:hidden">💬</span>
                   {unreadCount > 0 && (
                     <span className="absolute -top-1 -right-1 bg-gold text-gray-900 text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
                       {unreadCount > 99 ? '99+' : unreadCount}
                     </span>
                   )}
                 </Link>
+                {/* Admin Link - Only visible for admins */}
+                {user?.role === 'admin' && (
+                  <Link
+                    href="/admin"
+                    className="px-2 md:px-4 py-2 text-gray-700 hover:text-gold transition-colors font-semibold text-sm md:text-base"
+                    title="Admin Dashboard"
+                  >
+                    <span className="hidden sm:inline">Admin</span>
+                    <span className="sm:hidden">⚙️</span>
+                  </Link>
+                )}
                 <NotificationsBell />
                 <LanguageSwitcher />
                 {/* Profile Dropdown - Only avatar icon visible */}
@@ -243,24 +251,27 @@ export default function Navbar() {
                     Search
                   </Link>
                   <Link
-                    href="/chat"
-                    onClick={closeMobileMenu}
-                    className="px-4 py-2 text-gray-700 hover:text-gold hover:bg-gold/10 transition-colors font-semibold rounded-lg"
-                  >
-                    {t('navbar.chat')}
-                  </Link>
-                  <Link
                     href="/messages"
                     onClick={closeMobileMenu}
                     className="px-4 py-2 text-gray-700 hover:text-gold hover:bg-gold/10 transition-colors font-semibold rounded-lg relative"
                   >
-                    {t('navbar.messages')}
+                    Messages
                     {unreadCount > 0 && (
                       <span className="absolute top-1 right-1 bg-gold text-gray-900 text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
                         {unreadCount > 99 ? '99+' : unreadCount}
                       </span>
                     )}
                   </Link>
+                  {/* Admin Link - Only visible for admins (Mobile) */}
+                  {user?.role === 'admin' && (
+                    <Link
+                      href="/admin"
+                      onClick={closeMobileMenu}
+                      className="px-4 py-2 text-gray-700 hover:text-gold hover:bg-gold/10 transition-colors font-semibold rounded-lg"
+                    >
+                      Admin
+                    </Link>
+                  )}
                   <Link
                     href="/profile"
                     onClick={closeMobileMenu}

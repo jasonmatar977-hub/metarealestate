@@ -14,6 +14,8 @@ import { findOrCreateDirectConversation } from "@/lib/messages";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { isValidUrl } from "@/lib/utils";
 
+const COLLAPSED_STORAGE_KEY = "online_sidebar_collapsed";
+
 interface UserWithPresence {
   id: string;
   display_name: string | null;
@@ -30,6 +32,13 @@ export default function OnlineUsersSidebar() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [blockedUserIds, setBlockedUserIds] = useState<Set<string>>(new Set());
+  
+  // Collapsible state with localStorage persistence (default: open)
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const stored = localStorage.getItem(COLLAPSED_STORAGE_KEY);
+    return stored === 'true';
+  });
 
   // Load blocked users
   useEffect(() => {
@@ -376,12 +385,66 @@ export default function OnlineUsersSidebar() {
     return null;
   }
 
+  // Toggle collapse state and persist to localStorage
+  const toggleCollapse = () => {
+    const newCollapsed = !isCollapsed;
+    setIsCollapsed(newCollapsed);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(COLLAPSED_STORAGE_KEY, String(newCollapsed));
+    }
+  };
+
+  // Count online users
+  const onlineCount = users.filter((u) => u.is_online).length;
+
+  // Collapsed state: Show small floating button
+  if (isCollapsed) {
+    return (
+      <aside className="hidden lg:block fixed right-4 top-24 z-30">
+        <button
+          onClick={toggleCollapse}
+          className="px-4 py-2 bg-white/90 backdrop-blur-sm border border-gold/30 rounded-full shadow-lg hover:shadow-xl hover:bg-gold/10 transition-all flex items-center gap-2 group"
+          aria-label="Show online users"
+          title="Show online users"
+        >
+          <div className="w-2 h-2 rounded-full bg-green-500"></div>
+          <span className="text-sm font-semibold text-gray-700 group-hover:text-gold-dark transition-colors">
+            Online {onlineCount > 0 && `(${onlineCount})`}
+          </span>
+        </button>
+      </aside>
+    );
+  }
+
+  // Expanded state: Show full sidebar
+  // z-30: Behind modals (z-50) but above content, so content doesn't need margin
   return (
-    <aside className="hidden lg:block fixed right-0 top-0 h-screen w-[280px] pt-24 pb-20 px-4 overflow-y-auto z-40">
-      <div className="glass-dark rounded-2xl p-4">
-        <h2 className="font-orbitron text-lg font-bold text-gold-dark mb-4">
-          {t("profile.online") || "Online"}
-        </h2>
+    <aside className="hidden lg:block fixed right-0 top-0 h-screen w-[280px] pt-24 pb-20 px-4 overflow-y-auto z-30">
+      <div className="glass-dark rounded-2xl p-4 border border-gold/20 shadow-lg">
+        {/* Header with toggle button */}
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-orbitron text-lg font-bold text-gold-dark">
+            {t("profile.online") || "Online"} {onlineCount > 0 && `(${onlineCount})`}
+          </h2>
+          <button
+            onClick={toggleCollapse}
+            className="p-1.5 rounded-lg hover:bg-gold/20 transition-colors text-gray-600 hover:text-gold-dark"
+            aria-label="Hide online users"
+            title="Hide online users"
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
 
         {isLoading ? (
           <div className="text-center py-8">
@@ -410,7 +473,7 @@ export default function OnlineUsersSidebar() {
             </p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {users.map((userProfile) => {
               const displayName = userProfile.display_name || "User";
               const initials = getInitials(userProfile.display_name, userProfile.id);
@@ -419,7 +482,7 @@ export default function OnlineUsersSidebar() {
                 <button
                   key={userProfile.id}
                   onClick={() => handleUserClick(userProfile.id)}
-                  className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-gold/10 transition-colors text-left"
+                  className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-gold/10 transition-all text-left border border-gray-100 hover:border-gold/30 hover:shadow-sm"
                 >
                   {/* Avatar with online indicator */}
                   <div className="relative flex-shrink-0">
@@ -427,7 +490,7 @@ export default function OnlineUsersSidebar() {
                       <img
                         src={userProfile.avatar_url}
                         alt={displayName}
-                        className="w-10 h-10 rounded-full object-cover"
+                        className="w-11 h-11 rounded-full object-cover ring-2 ring-white"
                         onError={(e) => {
                           const target = e.target as HTMLImageElement;
                           target.style.display = "none";
@@ -435,20 +498,20 @@ export default function OnlineUsersSidebar() {
                           if (parent) {
                             const fallback = document.createElement("div");
                             fallback.className =
-                              "w-10 h-10 rounded-full bg-gradient-to-r from-gold to-gold-light flex items-center justify-center text-gray-900 font-bold text-xs";
+                              "w-11 h-11 rounded-full bg-gradient-to-r from-gold to-gold-light flex items-center justify-center text-gray-900 font-bold text-xs ring-2 ring-white";
                             fallback.textContent = initials;
                             parent.appendChild(fallback);
                           }
                         }}
                       />
                     ) : (
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-r from-gold to-gold-light flex items-center justify-center text-gray-900 font-bold text-xs">
+                      <div className="w-11 h-11 rounded-full bg-gradient-to-r from-gold to-gold-light flex items-center justify-center text-gray-900 font-bold text-xs ring-2 ring-white">
                         {initials}
                       </div>
                     )}
-                    {/* Online/Offline indicator */}
+                    {/* Online/Offline indicator dot */}
                     <div
-                      className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${
+                      className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-white ${
                         userProfile.is_online ? "bg-green-500" : "bg-gray-400"
                       }`}
                     />

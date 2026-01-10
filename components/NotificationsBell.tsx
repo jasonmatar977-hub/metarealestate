@@ -16,7 +16,8 @@ interface Notification {
   id: string;
   actor_id: string | null;
   type: 'follow' | 'new_post' | 'message';
-  entity_id: string | null;
+  entity_id: string | null; // UUID for conversations (messages)
+  entity_id_bigint: number | null; // BIGINT for post IDs (new_post)
   title: string;
   body: string | null;
   is_read: boolean;
@@ -32,11 +33,14 @@ export default function NotificationsBell() {
   const { t } = useLanguage();
   const router = useRouter();
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const subscriptionRef = useRef<any>(null);
+  const isSettingUpSubscriptionRef = useRef(false); // Guard for React Strict Mode
+
+  // Derive unreadCount from notifications state (single source of truth)
+  const unreadCount = notifications.filter(n => !n.is_read).length;
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -67,11 +71,13 @@ export default function NotificationsBell() {
       if (subscriptionRef.current) {
         try {
           subscriptionRef.current.unsubscribe();
+          supabase.removeChannel(subscriptionRef.current);
         } catch (e) {
           console.warn('[Notifications] Error unsubscribing:', e);
         }
         subscriptionRef.current = null;
       }
+      isSettingUpSubscriptionRef.current = false; // Reset guard
     };
   }, [isAuthenticated, user]);
 
@@ -87,6 +93,7 @@ export default function NotificationsBell() {
           actor_id,
           type,
           entity_id,
+          entity_id_bigint,
           title,
           body,
           is_read,
@@ -124,12 +131,26 @@ export default function NotificationsBell() {
       );
 
       setNotifications(notificationsWithActors);
-      setUnreadCount(notificationsWithActors.filter(n => !n.is_read).length);
+      // unreadCount is now derived from notifications state, no need to set it manually
     } catch (error) {
       console.error('[Notifications] Error loading notifications:', error);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Helper to load actor profile for a notification
+  const loadActorProfile = async (actorId: string) => {
+    const { data: actorProfile } = await supabase
+      .from('profiles')
+      .select('display_name, avatar_url')
+      .eq('id', actorId)
+      .single();
+
+    return actorProfile ? {
+      display_name: actorProfile.display_name,
+      avatar_url: actorProfile.avatar_url,
+    } : undefined;
   };
 
   const setupRealtimeSubscription = () => {
@@ -139,10 +160,24 @@ export default function NotificationsBell() {
     if (subscriptionRef.current) {
       try {
         subscriptionRef.current.unsubscribe();
+        supabase.removeChannel(subscriptionRef.current);
       } catch (e) {
         console.warn('[Notifications] Error cleaning up old subscription:', e);
       }
       subscriptionRef.current = null;
+    }
+
+    // Guard: Don't set up if already setting up (React Strict Mode double mount)
+    if (isSettingUpSubscriptionRef.current) {
+      if (process.env.NODE_ENV === "development") {
+        console.log('[Notifications] Already setting up subscription, skipping duplicate');
+      }
+      return;
+    }
+    isSettingUpSubscriptionRef.current = true;
+
+    if (process.env.NODE_ENV === "development") {
+      console.log('[Notifications] subscribed');
     }
 
     const channel = supabase
@@ -159,10 +194,55 @@ export default function NotificationsBell() {
           table: 'notifications',
           filter: `user_id=eq.${user.id}`,
         },
-        (payload) => {
-          console.log('[Notifications] New notification received:', payload);
-          // Reload notifications
-          loadNotifications();
+        async (payload) => {
+          if (process.env.NODE_ENV === "development") {
+            console.log('[Notifications] INSERT', payload.new?.id);
+          }
+
+          const newNotification = payload.new as any;
+          
+          // Prevent duplicates: check if notification ID already exists
+          setNotifications((prev) => {
+            const exists = prev.some((n) => n.id === newNotification.id);
+            if (exists) {
+              if (process.env.NODE_ENV === "development") {
+                console.log('[Notifications] Notification already exists, skipping duplicate:', newNotification.id);
+              }
+              return prev;
+            }
+            return prev; // Return unchanged, we'll update after loading actor
+          });
+
+          // Load actor profile if actor_id exists (outside setState)
+          let actor = undefined;
+          if (newNotification.actor_id) {
+            actor = await loadActorProfile(newNotification.actor_id);
+          }
+
+          // Now add the notification with actor profile
+          setNotifications((prev) => {
+            const exists = prev.some((n) => n.id === newNotification.id);
+            if (exists) {
+              return prev; // Already added
+            }
+
+            // Create notification object
+            const notification: Notification = {
+              id: newNotification.id,
+              actor_id: newNotification.actor_id,
+              type: newNotification.type,
+              entity_id: newNotification.entity_id,
+              entity_id_bigint: newNotification.entity_id_bigint,
+              title: newNotification.title,
+              body: newNotification.body,
+              is_read: newNotification.is_read || false,
+              created_at: newNotification.created_at,
+              actor,
+            };
+
+            // Prepend new notification to the list (most recent first)
+            return [notification, ...prev].slice(0, 20); // Keep only latest 20
+          });
         }
       )
       .on(
@@ -173,46 +253,93 @@ export default function NotificationsBell() {
           table: 'notifications',
           filter: `user_id=eq.${user.id}`,
         },
-        () => {
-          // Reload notifications when updated
-          loadNotifications();
+        (payload) => {
+          if (process.env.NODE_ENV === "development") {
+            console.log('[Notifications] UPDATE', payload.new?.id);
+          }
+
+          const updatedNotification = payload.new as any;
+          
+          // Update the matching notification in state
+          setNotifications((prev) => {
+            const index = prev.findIndex((n) => n.id === updatedNotification.id);
+            if (index === -1) {
+              // Notification not in state yet, ignore
+              return prev;
+            }
+
+            // Update the notification
+            const updated = [...prev];
+            updated[index] = {
+              ...updated[index],
+              is_read: updatedNotification.is_read || false,
+              title: updatedNotification.title || updated[index].title,
+              body: updatedNotification.body || updated[index].body,
+            };
+            return updated;
+          });
         }
       )
       .subscribe((status) => {
-        console.log('[Notifications] Realtime subscription status:', status);
+        if (status === "SUBSCRIBED") {
+          if (process.env.NODE_ENV === "development") {
+            console.log('[Notifications] Realtime subscription status: SUBSCRIBED');
+          }
+        } else if (status === "CHANNEL_ERROR") {
+          console.error('[Notifications] Realtime subscription error');
+        } else if (status === "TIMED_OUT") {
+          console.warn('[Notifications] Realtime subscription timed out');
+        }
       });
 
     subscriptionRef.current = channel;
+    isSettingUpSubscriptionRef.current = false; // Reset guard after setup
   };
 
   const handleNotificationClick = async (notification: Notification) => {
-    // Mark as read
+    // Mark as read immediately (optimistic update)
     if (!notification.is_read) {
+      // Update local state first for instant feedback
+      // unreadCount will update automatically since it's derived from notifications
+      setNotifications(prev =>
+        prev.map(n => n.id === notification.id ? { ...n, is_read: true } : n)
+      );
+      
+      // Then update in database
       try {
         await supabase
           .from('notifications')
           .update({ is_read: true })
           .eq('id', notification.id);
-
-        // Update local state
-        setNotifications(prev =>
-          prev.map(n => n.id === notification.id ? { ...n, is_read: true } : n)
-        );
-        setUnreadCount(prev => Math.max(0, prev - 1));
       } catch (error) {
         console.error('[Notifications] Error marking notification as read:', error);
+        // Revert optimistic update on error
+        setNotifications(prev =>
+          prev.map(n => n.id === notification.id ? { ...n, is_read: false } : n)
+        );
       }
     }
 
-    // Navigate based on type
+    // Close dropdown
     setIsOpen(false);
     
+    // Navigate based on notification type
     if (notification.type === 'follow' && notification.actor_id) {
-      router.push(`/u/${notification.actor_id}`);
-    } else if (notification.type === 'new_post' && notification.entity_id) {
-      router.push(`/feed`);
-      // Could scroll to post if we had post detail page
+      // Navigate to user profile
+      router.push(`/profile?userId=${notification.actor_id}`);
+    } else if (notification.type === 'new_post') {
+      // For posts, use entity_id_bigint (BIGINT) which contains the post ID
+      // Fallback to entity_id if entity_id_bigint is not available (backward compatibility)
+      const postId = notification.entity_id_bigint || notification.entity_id;
+      if (postId) {
+        router.push(`/feed?postId=${postId}`);
+      } else {
+        console.warn('[Notifications] Post notification missing post ID');
+        router.push('/feed');
+      }
     } else if (notification.type === 'message' && notification.entity_id) {
+      // Navigate to conversation
+      // entity_id contains the conversation_id (UUID)
       router.push(`/messages/${notification.entity_id}`);
     }
   };
@@ -220,18 +347,21 @@ export default function NotificationsBell() {
   const handleMarkAllAsRead = async () => {
     if (!user) return;
 
+    // Optimistic update: mark all as read immediately
+    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+
     try {
       await supabase
         .from('notifications')
         .update({ is_read: true })
         .eq('user_id', user.id)
         .eq('is_read', false);
-
-      // Update local state
-      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-      setUnreadCount(0);
+      
+      // unreadCount will be 0 automatically since all notifications are now read
     } catch (error) {
       console.error('[Notifications] Error marking all as read:', error);
+      // Revert optimistic update on error
+      loadNotifications();
     }
   };
 

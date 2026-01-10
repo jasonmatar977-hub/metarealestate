@@ -12,6 +12,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
 import Navbar from "@/components/Navbar";
 import MobileBottomNav from "@/components/MobileBottomNav";
+import OnlineUsersMobilePill from "@/components/OnlineUsersMobilePill";
 import Link from "next/link";
 import { isValidUrl } from "@/lib/utils";
 import { withTimeout, normalizeSupabaseError, isAuthError } from "@/lib/asyncGuard";
@@ -285,34 +286,43 @@ export default function ChatPage() {
     }
   }, [conversationId]);
 
+  // Helper to check if user is near bottom of scroll
+  const isNearBottom = useCallback(() => {
+    if (!messagesContainerRef.current) return true;
+    const container = messagesContainerRef.current;
+    const threshold = 200; // pixels from bottom
+    return container.scrollHeight - container.scrollTop - container.clientHeight < threshold;
+  }, []);
+
   const setupRealtimeSubscription = useCallback(() => {
-    if (!conversationId) return;
-    
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/7c97e237-f692-44e7-a6d1-13f83ea50b12',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatPage.tsx:288',message:'setupRealtimeSubscription called',data:{conversationId,hasExistingSubscription:!!subscriptionRef.current,isSettingUp:isSettingUpSubscriptionRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-    // #endregion
+    if (!conversationId || !user?.id) return;
     
     // Clean up existing subscription
     if (subscriptionRef.current) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/7c97e237-f692-44e7-a6d1-13f83ea50b12',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatPage.tsx:293',message:'Unsubscribing existing channel',data:{conversationId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
-      console.log("[Chat] Unsubscribing from existing channel");
-      subscriptionRef.current.unsubscribe();
+      if (process.env.NODE_ENV === "development") {
+        console.log("[Chat] Unsubscribing from existing channel");
+      }
+      try {
+        subscriptionRef.current.unsubscribe();
+        supabase.removeChannel(subscriptionRef.current);
+      } catch (e) {
+        console.warn("[Chat] Error unsubscribing from existing channel:", e);
+      }
       subscriptionRef.current = null;
     }
     
     // Guard: Don't set up if already setting up (React Strict Mode double mount)
     if (isSettingUpSubscriptionRef.current) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/7c97e237-f692-44e7-a6d1-13f83ea50b12',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatPage.tsx:300',message:'Skipping duplicate subscription setup',data:{conversationId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
-      console.log("[Chat] Already setting up subscription, skipping duplicate");
+      if (process.env.NODE_ENV === "development") {
+        console.log("[Chat] Already setting up subscription, skipping duplicate");
+      }
       return;
     }
     isSettingUpSubscriptionRef.current = true;
     
-    console.log("[Chat] Setting up realtime subscription for conversation:", conversationId);
+    if (process.env.NODE_ENV === "development") {
+      console.log("[Chat] Setting up realtime subscription for conversation:", conversationId);
+    }
     
     const channel = supabase
       .channel(`messages:${conversationId}`, {
@@ -329,8 +339,19 @@ export default function ChatPage() {
           filter: `conversation_id=eq.${conversationId}`,
         },
         (payload) => {
-          console.log("[Chat] New message received via realtime:", payload);
+          if (process.env.NODE_ENV === "development") {
+            console.log("[Realtime] INSERT message received:", payload.new?.id);
+          }
+          
           const newMessage = payload.new as any;
+          
+          // Only process messages for the current conversation
+          if (newMessage.conversation_id !== conversationId) {
+            if (process.env.NODE_ENV === "development") {
+              console.log("[Chat] Ignoring message from different conversation:", newMessage.conversation_id);
+            }
+            return;
+          }
           
           // Normalize: use content as primary, fallback to body
           const normalizedMessage: Message = {
@@ -348,10 +369,14 @@ export default function ChatPage() {
           setMessages((prev) => {
             const exists = prev.some((msg) => msg.id === normalizedMessage.id);
             if (exists) {
-              console.log("[Chat] Message already exists, skipping duplicate:", normalizedMessage.id);
+              if (process.env.NODE_ENV === "development") {
+                console.log("[Chat] Message already exists, skipping duplicate:", normalizedMessage.id);
+              }
               return prev;
             }
-            console.log("[Chat] Adding new message from realtime:", normalizedMessage.id);
+            if (process.env.NODE_ENV === "development") {
+              console.log("[Chat] Adding new message from realtime:", normalizedMessage.id);
+            }
             // Add new message and sort by created_at to maintain order
             const updated = [...prev, normalizedMessage].sort(
               (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
@@ -360,8 +385,10 @@ export default function ChatPage() {
           });
 
           // Mark message as read if it's not from current user
-          if (normalizedMessage.sender_id !== user?.id && !normalizedMessage.read_at) {
-            console.log("[Chat] Marking new message as read:", normalizedMessage.id);
+          if (normalizedMessage.sender_id !== user.id && !normalizedMessage.read_at) {
+            if (process.env.NODE_ENV === "development") {
+              console.log("[Chat] Marking new message as read:", normalizedMessage.id);
+            }
             supabase
               .from("messages")
               .update({ read_at: new Date().toISOString() })
@@ -369,63 +396,105 @@ export default function ChatPage() {
               .then(({ error }) => {
                 if (error) {
                   console.error("[Chat] Error marking message as read:", error);
-                } else {
-                  console.log("[Chat] Successfully marked message as read");
                 }
               });
           }
           
-          // Scroll to bottom when new message arrives
-          setTimeout(() => scrollToBottom(), 100);
+          // Scroll to bottom only if user is already near bottom
+          if (isNearBottom()) {
+            setTimeout(() => scrollToBottom(), 100);
+          }
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "messages",
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        (payload) => {
+          if (process.env.NODE_ENV === "development") {
+            console.log("[Realtime] UPDATE message received:", payload.new?.id);
+          }
+          
+          const updatedMessage = payload.new as any;
+          
+          // Only process updates for the current conversation
+          if (updatedMessage.conversation_id !== conversationId) {
+            return;
+          }
+          
+          // Update the message in state (e.g., read_at changes)
+          setMessages((prev) => {
+            const index = prev.findIndex((msg) => msg.id === updatedMessage.id);
+            if (index === -1) {
+              // Message not in state yet, ignore
+              return prev;
+            }
+            
+            // Update the message
+            const updated = [...prev];
+            updated[index] = {
+              ...updated[index],
+              read_at: updatedMessage.read_at || null,
+              content: updatedMessage.content ?? updatedMessage.body ?? updated[index].content,
+              image_url: updatedMessage.image_url || updated[index].image_url,
+              attachment_url: updatedMessage.attachment_url || updated[index].attachment_url,
+            };
+            return updated;
+          });
         }
       )
       .subscribe((status) => {
-        console.log("[Chat] Realtime subscription status:", status);
         if (status === "SUBSCRIBED") {
+          if (process.env.NODE_ENV === "development") {
+            console.log("[Realtime] Realtime subscribed");
+          }
           console.log("[Chat] ✅ Successfully subscribed to realtime updates");
         } else if (status === "CHANNEL_ERROR") {
           console.error("[Chat] ❌ Realtime subscription error");
         } else if (status === "TIMED_OUT") {
           console.warn("[Chat] ⚠️ Realtime subscription timed out");
         } else if (status === "CLOSED") {
-          console.log("[Chat] Realtime subscription closed");
+          if (process.env.NODE_ENV === "development") {
+            console.log("[Chat] Realtime subscription closed");
+          }
         }
       });
 
     subscriptionRef.current = channel;
     isSettingUpSubscriptionRef.current = false; // Reset guard after setup
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/7c97e237-f692-44e7-a6d1-13f83ea50b12',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatPage.tsx:378',message:'Realtime subscription setup complete',data:{conversationId,channelName:`messages:${conversationId}`},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-    // #endregion
-  }, [conversationId, user?.id]);
+  }, [conversationId, user?.id, isNearBottom]);
 
   // Load conversation data when component mounts or user/conversation changes
   useEffect(() => {
-    if (!isAuthenticated || !user?.id || !conversationId || loadingRef.current) return;
+    if (!isAuthenticated || !user?.id || !conversationId) return;
     
-    // Prevent double-loading
-    if (hasLoadedRef.current) return;
+    // Reset flags when conversationId changes
+    if (hasLoadedRef.current) {
+      hasLoadedRef.current = false;
+      loadingRef.current = false;
+    }
+    
+    if (loadingRef.current) return;
     
     loadingRef.current = true;
     hasLoadedRef.current = true;
     
     loadConversationData().finally(() => {
       loadingRef.current = false;
+      // Set up realtime subscription after messages are loaded
+      setupRealtimeSubscription();
     });
-    
-    setupRealtimeSubscription();
 
     return () => {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/7c97e237-f692-44e7-a6d1-13f83ea50b12',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatPage.tsx:418',message:'ChatPage cleanup',data:{conversationId,hasSubscription:!!subscriptionRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
-      // Cleanup subscription on unmount
+      // Cleanup subscription on unmount or conversationId change
       if (subscriptionRef.current) {
         try {
           subscriptionRef.current.unsubscribe();
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/7c97e237-f692-44e7-a6d1-13f83ea50b12',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatPage.tsx:424',message:'Subscription unsubscribed in cleanup',data:{conversationId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-          // #endregion
+          supabase.removeChannel(subscriptionRef.current);
         } catch (e) {
           console.warn("[Chat] Error unsubscribing on cleanup:", e);
         }
@@ -437,10 +506,13 @@ export default function ChatPage() {
     };
   }, [isAuthenticated, user?.id, conversationId, loadConversationData, setupRealtimeSubscription]);
 
-  // Scroll to bottom when messages change
+  // Scroll to bottom when messages change (only on initial load or when near bottom)
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    // Only auto-scroll if user is near bottom (to avoid interrupting user reading old messages)
+    if (isNearBottom() || messages.length <= 1) {
+      scrollToBottom();
+    }
+  }, [messages, isNearBottom]);
 
   const handleEmojiSelect = (emoji: string) => {
     if (messageInputRef.current) {
@@ -811,6 +883,7 @@ export default function ChatPage() {
                 <h2 className="font-semibold text-gray-900">{displayName}</h2>
               </div>
             )}
+            <OnlineUsersMobilePill />
           </div>
         </div>
 

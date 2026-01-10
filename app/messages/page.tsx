@@ -12,6 +12,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
 import Navbar from "@/components/Navbar";
 import MobileBottomNav from "@/components/MobileBottomNav";
+import OnlineUsersMobilePill from "@/components/OnlineUsersMobilePill";
 import Link from "next/link";
 import { isValidUrl } from "@/lib/utils";
 import { requestGuard, normalizeSupabaseError, isAuthError, debugLog, withTimeout, logSupabaseError } from "@/lib/asyncGuard";
@@ -504,9 +505,12 @@ export default function MessagesPage() {
       <Navbar />
       <div className="pt-24 pb-20 px-4">
         <div className="max-w-2xl mx-auto">
-          <h1 className="font-orbitron text-3xl sm:text-4xl font-bold text-center mb-6 text-gold-dark">
-            Messages
-          </h1>
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="font-orbitron text-3xl sm:text-4xl font-bold text-gold-dark">
+              Messages
+            </h1>
+            <OnlineUsersMobilePill />
+          </div>
 
           {error && (
             <div className="mb-6 p-4 bg-red-50 border-2 border-red-500 rounded-xl">

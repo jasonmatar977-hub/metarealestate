@@ -31,7 +31,7 @@ export default function MobileBottomNav() {
 
   const navItems = [
     { href: '/feed', icon: '🏠', label: t('navbar.feed') || 'Feed' },
-    { href: '/messages', icon: '💬', label: t('navbar.messages') || 'Messages' },
+    { href: '/messages', icon: '💬', label: 'Messages' },
     { href: '/profile', icon: getInitials(), label: t('common.profile') || 'Profile', isAvatar: true },
   ];
 
