@@ -9,6 +9,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
 import { useLanguage } from "@/contexts/LanguageContext";
+import VerifiedBadge from "@/components/VerifiedBadge";
 
 interface Comment {
   id: number;
@@ -19,6 +20,8 @@ interface Comment {
   parent_comment_id: number | null;
   profile?: {
     display_name: string | null;
+    is_verified?: boolean;
+    role?: string;
   };
   likes_count: number;
   user_liked: boolean;
@@ -63,11 +66,11 @@ export default function Comments({ postId, initialShowAll = false }: CommentsPro
         return;
       }
 
-      // Get user IDs and fetch profiles
+      // Get user IDs and fetch profiles (including is_verified and role for badge)
       const userIds = [...new Set(commentsData.map((c) => c.user_id))];
       const { data: profilesData } = await supabase
         .from('profiles')
-        .select('id, display_name')
+        .select('id, display_name, is_verified, role')
         .in('id', userIds);
 
       // Get comment likes
@@ -88,7 +91,11 @@ export default function Comments({ postId, initialShowAll = false }: CommentsPro
 
         return {
           ...comment,
-          profile: profile ? { display_name: profile.display_name } : undefined,
+          profile: profile ? { 
+            display_name: profile.display_name,
+            is_verified: profile.is_verified,
+            role: profile.role,
+          } : undefined,
           likes_count: commentLikes.length,
           user_liked: user ? commentLikes.some((l) => l.user_id === user.id) : false,
           replies: [] as Comment[], // Initialize replies array
@@ -319,10 +326,15 @@ export default function Comments({ postId, initialShowAll = false }: CommentsPro
                       {getInitials(comment.profile?.display_name, comment.user_id)}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className="font-semibold text-gray-900 text-sm">
                           {comment.profile?.display_name || 'User'}
                         </span>
+                        <VerifiedBadge 
+                          isVerified={comment.profile?.is_verified} 
+                          role={comment.profile?.role}
+                          size="sm"
+                        />
                         <span className="text-xs text-gray-500">
                           {formatTimestamp(comment.created_at)}
                         </span>
@@ -414,10 +426,15 @@ export default function Comments({ postId, initialShowAll = false }: CommentsPro
                                 {getInitials(reply.profile?.display_name, reply.user_id)}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 mb-1">
+                                <div className="flex items-center gap-2 mb-1 flex-wrap">
                                   <span className="font-semibold text-gray-900 text-sm">
                                     {reply.profile?.display_name || 'User'}
                                   </span>
+                                  <VerifiedBadge 
+                                    isVerified={reply.profile?.is_verified} 
+                                    role={reply.profile?.role}
+                                    size="sm"
+                                  />
                                   <span className="text-xs text-gray-500">
                                     {formatTimestamp(reply.created_at)}
                                   </span>

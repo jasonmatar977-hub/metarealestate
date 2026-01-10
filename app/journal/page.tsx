@@ -23,15 +23,19 @@ interface Area {
   status: "heating" | "cooling" | "stable";
   last_updated: string;
   takeaway: string | null;
+  user_id?: string | null;
 }
 
 export default function JournalHubPage() {
-  const { isAuthenticated, isLoading, loadingSession } = useAuth();
+  const { isAuthenticated, isLoading, loadingSession, user } = useAuth();
   const { t } = useLanguage();
   const router = useRouter();
   const [areas, setAreas] = useState<Area[]>([]);
   const [isLoadingAreas, setIsLoadingAreas] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Check if user can create journals (verified or admin)
+  const canCreateJournal = user && (user.is_verified === true || user.role === 'admin');
 
   useEffect(() => {
     if (!loadingSession && !isLoading && !isAuthenticated) {
@@ -49,9 +53,10 @@ export default function JournalHubPage() {
       setError(null);
 
       // Try to fetch from database, fallback to seed data
+      // Include user_id to check ownership (needed for edit/delete controls)
       const { data, error: fetchError } = await supabase
         .from("area_journals")
-        .select("id, slug, name, city, status, last_updated, takeaway")
+        .select("id, slug, name, city, status, last_updated, takeaway, user_id")
         .eq("city", "beirut")
         .order("name", { ascending: true });
 
@@ -188,7 +193,21 @@ export default function JournalHubPage() {
         <div className="max-w-6xl mx-auto">
           {/* Header */}
           <div className="mb-8">
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">{t('journal.hubTitle')}</h1>
+            <div className="flex items-center justify-between mb-2 mt-6">
+              <h1 className="text-4xl font-bold text-gray-900">{t('journal.hubTitle')}</h1>
+              {/* Add Journal Button - Only visible for verified users or admins */}
+              {canCreateJournal && (
+                <Link
+                  href="/journal/new"
+                  className="px-6 py-3 bg-gradient-to-r from-gold to-gold-light text-gray-900 font-bold rounded-xl hover:shadow-lg transition-all flex items-center gap-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                  </svg>
+                  Add Journal
+                </Link>
+              )}
+            </div>
             <p className="text-gray-600 text-lg">{t('journal.hubSubtitle')}</p>
           </div>
 

@@ -14,6 +14,7 @@ import Navbar from "@/components/Navbar";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
+import toast from "react-hot-toast";
 
 interface AreaJournal {
   id: string;
@@ -52,14 +53,16 @@ interface ContributorNote {
 export default function AreaDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { isAuthenticated, isLoading, loadingSession } = useAuth();
+  const { isAuthenticated, isLoading, loadingSession, user } = useAuth();
   const { t } = useLanguage();
   const areaSlug = params.areaSlug as string;
 
-  const [journal, setJournal] = useState<AreaJournal | null>(null);
+  const [journal, setJournal] = useState<AreaJournal & { user_id?: string | null } | null>(null);
   const [contributorNotes, setContributorNotes] = useState<ContributorNote[]>([]);
   const [isLoadingJournal, setIsLoadingJournal] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (!loadingSession && !isLoading && !isAuthenticated) {
@@ -79,6 +82,7 @@ export default function AreaDetailPage() {
       setError(null);
 
       // Try to fetch from database, fallback to seed data
+      // Include user_id to check ownership (needed for edit/delete controls)
       const { data, error: fetchError } = await supabase
         .from("area_journals")
         .select("*")
@@ -254,6 +258,37 @@ export default function AreaDetailPage() {
     }
   };
 
+  // Check if current user can edit/delete this journal
+  const canEdit = user && journal && (journal.user_id === user.id || user.role === 'admin');
+
+  // Handle delete journal
+  const handleDelete = async () => {
+    if (!journal || !user) return;
+
+    setIsDeleting(true);
+    try {
+      const { error: deleteError } = await supabase
+        .from("area_journals")
+        .delete()
+        .eq("id", journal.id);
+
+      if (deleteError) {
+        console.error("[Journal] Error deleting journal:", deleteError);
+        toast.error(deleteError.message || "Failed to delete journal. Please try again.");
+        setIsDeleting(false);
+        return;
+      }
+
+      // Success - show toast and redirect to journal list
+      toast.success("Journal deleted successfully");
+      router.push("/journal");
+    } catch (err: any) {
+      console.error("[Journal] Exception deleting journal:", err);
+      toast.error(err?.message || "An error occurred. Please try again.");
+      setIsDeleting(false);
+    }
+  };
+
   if (loadingSession || isLoading || isLoadingJournal) {
     return (
       <main className="min-h-screen flex items-center justify-center">
@@ -284,18 +319,73 @@ export default function AreaDetailPage() {
             </Link>
             <div className="flex items-center justify-between mb-4">
               <h1 className="text-4xl font-bold text-gray-900">{journal.name}</h1>
-              <span
-                className={`px-4 py-2 rounded-full text-sm font-semibold border ${getStatusBadgeColor(
-                  journal.status
-                )}`}
-              >
-                {t(`journal.${journal.status}`)}
-              </span>
+              <div className="flex items-center gap-3">
+                <span
+                  className={`px-4 py-2 rounded-full text-sm font-semibold border ${getStatusBadgeColor(
+                    journal.status
+                  )}`}
+                >
+                  {t(`journal.${journal.status}`)}
+                </span>
+                {/* Edit/Delete Buttons - Only visible for owner or admin */}
+                {canEdit && (
+                  <div className="flex items-center gap-2">
+                    <Link
+                      href={`/journal/beirut/${journal.slug}/edit`}
+                      className="p-2 text-gray-600 hover:text-gold hover:bg-gold/10 rounded-lg transition-all"
+                      title="Edit Journal"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </Link>
+                    <button
+                      onClick={() => setShowDeleteConfirm(true)}
+                      className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                      title="Delete Journal"
+                      disabled={isDeleting}
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
             <p className="text-gray-600">
               {t('journal.lastUpdatedLabel')}: {formatDate(journal.last_updated)}
             </p>
           </div>
+
+          {/* Delete Confirmation Modal */}
+          {showDeleteConfirm && (
+            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl">
+                <h3 className="text-xl font-bold text-gray-900 mb-4">Delete Journal</h3>
+                <p className="text-gray-600 mb-6">Are you sure you want to delete this journal? This action cannot be undone.</p>
+                <div className="flex gap-4">
+                  <button
+                    onClick={() => setShowDeleteConfirm(false)}
+                    className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 font-bold rounded-xl hover:bg-gray-300 transition-all"
+                    disabled={isDeleting}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={async () => {
+                      await handleDelete();
+                      setShowDeleteConfirm(false);
+                    }}
+                    className="flex-1 px-4 py-2 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={isDeleting}
+                  >
+                    {isDeleting ? "Deleting..." : "Delete"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Snapshot Section */}
           <section className="glass-dark rounded-2xl p-6 mb-6 border border-gold/20">

@@ -19,6 +19,7 @@ import PostCard from "@/components/PostCard";
 import { isValidUrl } from "@/lib/utils";
 import { useLanguage } from "@/contexts/LanguageContext";
 import FollowersFollowingModal from "@/components/FollowersFollowingModal";
+import VerifiedBadge from "@/components/VerifiedBadge";
 
 // Clickable button component for Followers/Following counts
 function FollowersFollowingButton({
@@ -66,6 +67,8 @@ interface Profile {
   website: string | null;
   phone_public: boolean;
   created_at: string;
+  is_verified?: boolean;
+  role?: string;
 }
 
 export default function ProfilePage() {
@@ -96,7 +99,7 @@ export default function ProfilePage() {
         setIsLoading(true);
         const { data, error } = await supabase
           .from('profiles')
-          .select('*')
+          .select('id, display_name, bio, avatar_url, location, phone, website, phone_public, created_at, is_verified, role')
           .eq('id', user.id)
           .single();
 
@@ -283,9 +286,16 @@ export default function ProfilePage() {
 
               {/* Profile Info */}
               <div className="flex-1 text-center sm:text-left">
-                <h1 className="font-orbitron text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-                  {displayName}
-                </h1>
+                <div className="flex items-center gap-2 justify-center sm:justify-start mb-2">
+                  <h1 className="font-orbitron text-2xl sm:text-3xl font-bold text-gray-900">
+                    {displayName}
+                  </h1>
+                  <VerifiedBadge 
+                    isVerified={profile?.is_verified} 
+                    role={profile?.role}
+                    size="md"
+                  />
+                </div>
                 {profile?.bio && (
                   <p className="text-gray-700 mb-4 whitespace-pre-wrap">{profile.bio}</p>
                 )}

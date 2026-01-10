@@ -13,6 +13,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
 import Comments from "@/components/Comments";
 import { isValidUrl } from "@/lib/utils";
+import VerifiedBadge from "@/components/VerifiedBadge";
 
 interface PostCardProps {
   postId: number;
@@ -27,6 +28,8 @@ interface PostCardProps {
   comments?: number;
   onLikeToggle: () => void;
   onPostDeleted?: () => void; // Callback when post is deleted
+  authorVerified?: boolean;
+  authorRole?: string;
 }
 
 export default function PostCard({
@@ -42,6 +45,8 @@ export default function PostCard({
   comments = 0,
   onLikeToggle,
   onPostDeleted,
+  authorVerified,
+  authorRole,
 }: PostCardProps) {
   const { user } = useAuth();
   const [isLiking, setIsLiking] = useState(false);
@@ -235,7 +240,14 @@ export default function PostCard({
           {avatar}
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="font-bold text-gray-900 truncate">{username}</h3>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="font-bold text-gray-900 truncate">{username}</h3>
+            <VerifiedBadge 
+              isVerified={authorVerified} 
+              role={authorRole}
+              size="sm"
+            />
+          </div>
           <p className="text-sm text-gray-500">{timestamp}</p>
         </div>
         {/* Delete Button - Only show for post owner */}

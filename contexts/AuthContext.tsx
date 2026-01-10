@@ -20,6 +20,8 @@ interface User {
   name: string;
   username: string;
   displayName?: string;
+  is_verified?: boolean;
+  role?: string;
 }
 
 interface AuthContextType {
@@ -67,10 +69,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Load user profile from Supabase
   const loadUserProfile = useCallback(async (supabaseUser: SupabaseUser): Promise<User | null> => {
     try {
-      // Get profile from profiles table
+      // Get profile from profiles table (including is_verified and role)
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('display_name')
+        .select('display_name, is_verified, role')
         .eq('id', supabaseUser.id)
         .single();
 
@@ -91,6 +93,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         name: profile?.display_name || supabaseUser.user_metadata?.full_name || supabaseUser.email?.split('@')[0] || 'User',
         username: supabaseUser.user_metadata?.username || supabaseUser.email?.split('@')[0] || 'user',
         displayName: profile?.display_name,
+        is_verified: profile?.is_verified ?? false,
+        role: profile?.role ?? 'user',
       };
     } catch (error) {
       const normalized = normalizeSupabaseError(error);

@@ -9,119 +9,137 @@
  * All property data is treated as untrusted and rendered safely
  */
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { supabase } from "@/lib/supabaseClient";
 import Navbar from "@/components/Navbar";
 import PropertyCard from "@/components/PropertyCard";
 import Footer from "@/components/Footer";
+import toast from "react-hot-toast";
+import VerifiedBadge from "@/components/VerifiedBadge";
 
-// Enhanced property data structure
+// Enhanced property data structure (matches database schema)
 interface Property {
   id: number;
+  user_id: string; // Owner user ID
   title: string;
-  location: string;
-  price: number; // Numeric for sorting
+  location: string; // Using city as location
+  price: number | null; // Numeric for sorting
   priceDisplay: string; // Formatted display
-  description: string;
-  bedrooms: number;
-  bathrooms: number;
-  type: 'house' | 'apartment' | 'condo' | 'villa' | 'townhouse';
-  area: number; // sq ft
+  description: string | null;
+  bedrooms?: number;
+  bathrooms?: number;
+  type?: 'house' | 'apartment' | 'condo' | 'villa' | 'townhouse';
+  area?: number;
   imageUrl?: string;
+  image_urls?: string[] | null;
+  created_at: string;
+  ownerName?: string | null;
+  ownerVerified?: boolean;
+  ownerRole?: string;
 }
 
-// Mock property data with enhanced fields
-const MOCK_PROPERTIES: Property[] = [
-  {
-    id: 1,
-    title: "Modern Luxury Villa",
-    location: "Beirut, Lebanon",
-    price: 850000,
-    priceDisplay: "$850,000",
-    bedrooms: 4,
-    bathrooms: 3,
-    type: "villa",
-    area: 3500,
-    description: "Stunning 4-bedroom villa with panoramic sea views, modern amenities, and private pool. Perfect for families seeking luxury living.",
-  },
-  {
-    id: 2,
-    title: "Downtown Apartment",
-    location: "New York, USA",
-    price: 1200000,
-    priceDisplay: "$1,200,000",
-    bedrooms: 3,
-    bathrooms: 2,
-    type: "apartment",
-    area: 1800,
-    description: "Spacious 3-bedroom apartment in the heart of Manhattan. High-end finishes, concierge service, and walking distance to Central Park.",
-  },
-  {
-    id: 3,
-    title: "Beachfront Condo",
-    location: "Barcelona, Spain",
-    price: 650000,
-    priceDisplay: "€650,000",
-    bedrooms: 2,
-    bathrooms: 2,
-    type: "condo",
-    area: 1200,
-    description: "Beautiful 2-bedroom condo with direct beach access. Modern design, fully furnished, and excellent investment opportunity.",
-  },
-  {
-    id: 4,
-    title: "Suburban Family Home",
-    location: "Sydney, Australia",
-    price: 950000,
-    priceDisplay: "A$950,000",
-    bedrooms: 5,
-    bathrooms: 3,
-    type: "house",
-    area: 2800,
-    description: "Charming 5-bedroom family home with large backyard, double garage, and close to schools. Ideal for growing families.",
-  },
-  {
-    id: 5,
-    title: "Penthouse Suite",
-    location: "Dubai, UAE",
-    price: 2500000,
-    priceDisplay: "$2,500,000",
-    bedrooms: 4,
-    bathrooms: 4,
-    type: "apartment",
-    area: 4500,
-    description: "Luxurious 4-bedroom penthouse with private terrace, city views, and premium amenities. The epitome of modern living.",
-  },
-  {
-    id: 6,
-    title: "Historic Townhouse",
-    location: "London, UK",
-    price: 1800000,
-    priceDisplay: "£1,800,000",
-    bedrooms: 3,
-    bathrooms: 2,
-    type: "townhouse",
-    area: 2000,
-    description: "Elegant 3-bedroom townhouse in prime location. Period features combined with modern updates, perfect for professionals.",
-  },
-];
-
 type SortOption = 'newest' | 'price-low' | 'price-high';
-type PropertyType = 'all' | Property['type'];
 
 export default function ListingsPage() {
-  const { isAuthenticated, isLoading, loadingSession } = useAuth();
+  const { isAuthenticated, isLoading, loadingSession, user } = useAuth();
   const { t } = useLanguage();
   const router = useRouter();
   const [hasRedirected, setHasRedirected] = useState(false);
+  const [listings, setListings] = useState<Property[]>([]);
+  const [isLoadingListings, setIsLoadingListings] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 5000000]);
   const [bedrooms, setBedrooms] = useState<number | 'all'>('all');
-  const [propertyType, setPropertyType] = useState<PropertyType>('all');
+  const [propertyType, setPropertyType] = useState<'all' | 'house' | 'apartment' | 'condo' | 'villa' | 'townhouse'>('all');
   const [sortBy, setSortBy] = useState<SortOption>('newest');
+
+  // Check if user can create listings
+  const canCreateListing = user && (user.is_verified === true || user.role === 'admin');
+  const [deletingListingId, setDeletingListingId] = useState<number | null>(null);
+
+  // Load listings from database
+  const loadListings = useCallback(async () => {
+    if (!isAuthenticated || !user) {
+      setIsLoadingListings(false);
+      return;
+    }
+
+    try {
+      setIsLoadingListings(true);
+      setError(null);
+
+      const { data, error: fetchError } = await supabase
+        .from('listings')
+        .select('id, user_id, title, description, price, city, image_urls, created_at')
+        .order('created_at', { ascending: false });
+
+      if (fetchError) {
+        console.error("[Listings] Error loading listings:", fetchError);
+        setError(fetchError.message || "Failed to load listings");
+        toast.error("Failed to load listings");
+        return;
+      }
+
+      // Get unique owner IDs and fetch profiles (batch fetch to avoid N+1)
+      const ownerIds = [...new Set((data || []).map((listing) => listing.user_id))];
+      const { data: ownerProfiles } = await supabase
+        .from('profiles')
+        .select('id, display_name, is_verified, role')
+        .in('id', ownerIds);
+
+      // Create a map of owner profiles for quick lookup
+      const ownerMap = new Map(
+        (ownerProfiles || []).map((profile) => [profile.id, profile])
+      );
+
+      // Transform database data to Property format (include owner info)
+      const transformedListings: Property[] = (data || []).map((listing) => {
+        const owner = ownerMap.get(listing.user_id);
+        return {
+          id: listing.id,
+          user_id: listing.user_id,
+          title: listing.title,
+          location: listing.city || 'Location not specified',
+          price: listing.price ? parseFloat(listing.price.toString()) : null,
+          priceDisplay: listing.price
+            ? new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0,
+              }).format(parseFloat(listing.price.toString()))
+            : 'Price not specified',
+          description: listing.description || null,
+          image_urls: listing.image_urls || null,
+          imageUrl: listing.image_urls && listing.image_urls.length > 0 ? listing.image_urls[0] : undefined,
+          created_at: listing.created_at,
+          ownerName: owner?.display_name || null,
+          ownerVerified: owner?.is_verified,
+          ownerRole: owner?.role,
+        };
+      });
+
+      setListings(transformedListings);
+    } catch (error: any) {
+      console.error("[Listings] Exception loading listings:", error);
+      setError(error?.message || "An error occurred");
+      toast.error("Failed to load listings");
+    } finally {
+      setIsLoadingListings(false);
+    }
+  }, [isAuthenticated, user]);
+
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      loadListings();
+    }
+  }, [isAuthenticated, user, loadListings]);
 
   useEffect(() => {
     // Do not redirect until initial session check completes
@@ -131,9 +149,89 @@ export default function ListingsPage() {
     }
   }, [isAuthenticated, isLoading, loadingSession, router, hasRedirected]);
 
+  // Handle edit listing
+  const handleEditListing = (listingId: number, listingUserId: string) => {
+    // Security check: Only owner or admin can edit
+    if (!user) {
+      toast.error("You must be logged in to edit listings");
+      return;
+    }
+
+    const isOwner = user.id === listingUserId;
+    const isAdmin = user.role === 'admin';
+
+    if (!isOwner && !isAdmin) {
+      toast.error("You don't have permission to edit this listing");
+      return;
+    }
+
+    // Confirm edit (before navigating)
+    const confirmed = window.confirm("Do you want to edit this listing?");
+    if (!confirmed) {
+      return;
+    }
+
+    // Navigate to edit page
+    router.push(`/listings/${listingId}/edit`);
+  };
+
+  // Handle delete listing
+  const handleDeleteListing = async (listingId: number, listingUserId: string) => {
+    // Security check: Only owner or admin can delete
+    if (!user) {
+      toast.error("You must be logged in to delete listings");
+      return;
+    }
+
+    const isOwner = user.id === listingUserId;
+    const isAdmin = user.role === 'admin';
+
+    if (!isOwner && !isAdmin) {
+      toast.error("You don't have permission to delete this listing");
+      return;
+    }
+
+    // Confirm deletion
+    const confirmed = window.confirm("Are you sure you want to delete this listing?");
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingListingId(listingId);
+
+    try {
+      // Delete listing (RLS will enforce owner/admin check)
+      const { error: deleteError } = await supabase
+        .from('listings')
+        .delete()
+        .eq('id', listingId);
+
+      if (deleteError) {
+        console.error("[Listings] Error deleting listing:", deleteError);
+        
+        // Check if it's an RLS policy violation
+        if (deleteError.code === '42501' || deleteError.message?.includes('permission denied') || deleteError.message?.includes('policy')) {
+          toast.error("You don't have permission to delete this listing");
+        } else {
+          toast.error("Failed to delete listing");
+        }
+        return;
+      }
+
+      // Success: Remove listing from UI instantly (optimistic update)
+      setListings((prev) => prev.filter((listing) => listing.id !== listingId));
+      toast.success("Listing deleted");
+    } catch (error: any) {
+      console.error("[Listings] Exception deleting listing:", error);
+      toast.error("Failed to delete listing");
+    } finally {
+      setDeletingListingId(null);
+    }
+  };
+
   // Filter and sort properties
   const filteredProperties = useMemo(() => {
-    let filtered = [...MOCK_PROPERTIES];
+    let filtered = [...listings];
 
     // Search filter
     if (searchQuery.trim()) {
@@ -142,21 +240,22 @@ export default function ListingsPage() {
         (p) =>
           p.title.toLowerCase().includes(query) ||
           p.location.toLowerCase().includes(query) ||
-          p.description.toLowerCase().includes(query)
+          (p.description && p.description.toLowerCase().includes(query))
       );
     }
 
-    // Price range filter
-    filtered = filtered.filter(
-      (p) => p.price >= priceRange[0] && p.price <= priceRange[1]
-    );
+    // Price range filter (only if price exists)
+    filtered = filtered.filter((p) => {
+      if (p.price === null) return true; // Include listings without price
+      return p.price >= priceRange[0] && p.price <= priceRange[1];
+    });
 
-    // Bedrooms filter
+    // Bedrooms filter (skip if not available)
     if (bedrooms !== 'all') {
       filtered = filtered.filter((p) => p.bedrooms === bedrooms);
     }
 
-    // Property type filter
+    // Property type filter (skip if not available)
     if (propertyType !== 'all') {
       filtered = filtered.filter((p) => p.type === propertyType);
     }
@@ -165,17 +264,23 @@ export default function ListingsPage() {
     filtered.sort((a, b) => {
       switch (sortBy) {
         case 'price-low':
+          if (a.price === null && b.price === null) return 0;
+          if (a.price === null) return 1;
+          if (b.price === null) return -1;
           return a.price - b.price;
         case 'price-high':
+          if (a.price === null && b.price === null) return 0;
+          if (a.price === null) return 1;
+          if (b.price === null) return -1;
           return b.price - a.price;
         case 'newest':
         default:
-          return b.id - a.id; // Assuming higher ID = newer
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       }
     });
 
     return filtered;
-  }, [searchQuery, priceRange, bedrooms, propertyType, sortBy]);
+  }, [listings, searchQuery, priceRange, bedrooms, propertyType, sortBy]);
 
   if (isLoading) {
     return (
@@ -206,12 +311,29 @@ export default function ListingsPage() {
       <Navbar />
       <div className="pt-24 pb-20 px-4">
         <div className="max-w-7xl mx-auto w-full">
-          <h1 className="font-orbitron text-3xl sm:text-4xl md:text-5xl font-bold text-center mb-4 text-gold-dark px-4">
-            {t('listings.title')}
-          </h1>
-          <p className="text-center text-gray-600 mb-8 sm:mb-12 text-base sm:text-lg px-4">
-            {t('listings.subtitle')}
-          </p>
+          <div className="flex flex-col sm:flex-row justify-between items-center mb-6 sm:mb-8 px-4">
+            <div className="mb-4 sm:mb-0">
+              <h1 className="font-orbitron text-3xl sm:text-4xl md:text-5xl font-bold text-gold-dark">
+                {t('listings.title')}
+              </h1>
+              <p className="text-center sm:text-left text-gray-600 mt-2 text-base sm:text-lg">
+                {t('listings.subtitle')}
+              </p>
+            </div>
+            {/* Add Listing Button - Only for verified users or admins */}
+            {canCreateListing ? (
+              <Link
+                href="/listings/new"
+                className="px-6 py-3 bg-gradient-to-r from-gold to-gold-light text-gray-900 font-bold rounded-xl hover:shadow-lg hover:scale-105 transition-all whitespace-nowrap"
+              >
+                + Add Listing
+              </Link>
+            ) : user ? (
+              <div className="px-6 py-3 bg-gray-200 text-gray-600 font-semibold rounded-xl cursor-not-allowed whitespace-nowrap text-sm text-center">
+                Verification Required
+              </div>
+            ) : null}
+          </div>
 
           {/* Search and Filters */}
           <div className="glass-dark rounded-2xl p-4 sm:p-6 mb-8">
@@ -277,7 +399,7 @@ export default function ListingsPage() {
                 </label>
                 <select
                   value={propertyType}
-                  onChange={(e) => setPropertyType(e.target.value as PropertyType)}
+                  onChange={(e) => setPropertyType(e.target.value as 'all' | 'house' | 'apartment' | 'condo' | 'villa' | 'townhouse')}
                   className="w-full px-3 py-2 rounded-lg border-2 border-gold/40 focus:border-gold focus:outline-none text-sm"
                 >
                   <option value="all">All Types</option>
@@ -307,46 +429,91 @@ export default function ListingsPage() {
             </div>
           </div>
 
-          {/* Results Count */}
-          <div className="mb-6">
-            <p className="text-gray-600">
-              Found <span className="font-bold text-gold-dark">{filteredProperties.length}</span> properties
-            </p>
-          </div>
-
-          {/* Properties Grid */}
-          {filteredProperties.length === 0 ? (
+          {/* Loading State */}
+          {isLoadingListings ? (
             <div className="text-center py-12">
-              <p className="text-gray-600 mb-4">No properties found matching your criteria.</p>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gold mx-auto mb-4"></div>
+              <p className="text-gray-600">Loading listings...</p>
+            </div>
+          ) : error ? (
+            <div className="text-center py-12">
+              <p className="text-red-600 mb-4">{error}</p>
               <button
-                onClick={() => {
-                  setSearchQuery("");
-                  setPriceRange([0, 5000000]);
-                  setBedrooms('all');
-                  setPropertyType('all');
-                  setSortBy('newest');
-                }}
-                className="px-6 py-2 bg-gradient-to-r from-gold to-gold-light text-gray-900 font-bold rounded-xl hover:shadow-lg transition-all"
+                onClick={loadListings}
+                className="px-6 py-2 bg-gold text-gray-900 font-bold rounded-xl hover:shadow-lg transition-all"
               >
-                Clear Filters
+                Retry
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-              {filteredProperties.map((property) => (
-                <PropertyCard
-                  key={property.id}
-                  title={property.title}
-                  location={property.location}
-                  price={property.priceDisplay}
-                  description={property.description}
-                  bedrooms={property.bedrooms}
-                  bathrooms={property.bathrooms}
-                  type={property.type}
-                  area={property.area}
-                />
-              ))}
-            </div>
+            <>
+              {/* Results Count */}
+              <div className="mb-6">
+                <p className="text-gray-600">
+                  Found <span className="font-bold text-gold-dark">{filteredProperties.length}</span> {filteredProperties.length === 1 ? 'listing' : 'listings'}
+                </p>
+              </div>
+
+              {/* Properties Grid */}
+              {filteredProperties.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-gray-600 mb-4">
+                    {listings.length === 0
+                      ? "No listings yet. Be the first to create one!"
+                      : "No properties found matching your criteria."}
+                  </p>
+                  {listings.length === 0 && canCreateListing && (
+                    <Link
+                      href="/listings/new"
+                      className="inline-block px-6 py-2 bg-gradient-to-r from-gold to-gold-light text-gray-900 font-bold rounded-xl hover:shadow-lg transition-all"
+                    >
+                      Create First Listing
+                    </Link>
+                  )}
+                  {listings.length > 0 && (
+                    <button
+                      onClick={() => {
+                        setSearchQuery("");
+                        setPriceRange([0, 5000000]);
+                        setBedrooms('all');
+                        setPropertyType('all');
+                        setSortBy('newest');
+                      }}
+                      className="px-6 py-2 bg-gradient-to-r from-gold to-gold-light text-gray-900 font-bold rounded-xl hover:shadow-lg transition-all"
+                    >
+                      Clear Filters
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                  {filteredProperties.map((property) => (
+                    <PropertyCard
+                      key={property.id}
+                      listingId={property.id}
+                      listingUserId={property.user_id}
+                      title={property.title}
+                      location={property.location}
+                      price={property.priceDisplay}
+                      description={property.description || ""}
+                      imageUrl={property.image_urls && property.image_urls.length > 0 ? property.image_urls[0] : undefined}
+                      bedrooms={property.bedrooms}
+                      bathrooms={property.bathrooms}
+                      type={property.type}
+                      area={property.area}
+                      currentUserId={user?.id}
+                      currentUserRole={user?.role}
+                      onEdit={handleEditListing}
+                      onDelete={handleDeleteListing}
+                      isDeleting={deletingListingId === property.id}
+                      ownerName={property.ownerName}
+                      ownerVerified={property.ownerVerified}
+                      ownerRole={property.ownerRole}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

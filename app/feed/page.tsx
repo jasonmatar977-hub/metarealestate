@@ -9,8 +9,8 @@
  * All post content is treated as untrusted and rendered safely
  */
 
-import { useEffect, useState, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState, useRef, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
@@ -30,6 +30,8 @@ interface Post {
   image_url?: string | null;
   profile?: {
     display_name: string | null;
+    is_verified?: boolean;
+    role?: string;
   };
   likes_count?: number;
   user_liked?: boolean;
@@ -38,9 +40,10 @@ interface Post {
 
 type FeedTab = "foryou" | "following";
 
-export default function FeedPage() {
+function FeedPageContent() {
   const { isAuthenticated, isLoading, loadingSession, user } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<FeedTab>("foryou");
   const [posts, setPosts] = useState<Post[]>([]);
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
@@ -48,6 +51,42 @@ export default function FeedPage() {
   const [hasRedirected, setHasRedirected] = useState(false); // Prevent infinite redirect loops
   const [deletingPostId, setDeletingPostId] = useState<number | null>(null); // Track which post is being deleted
   const [suggestedUsers, setSuggestedUsers] = useState<any[]>([]);
+  const postRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+
+  // Scroll to a specific post by ID (used when navigating from notifications)
+  const scrollToPost = (postId: number | string) => {
+    const numericPostId = typeof postId === 'string' ? parseInt(postId, 10) : postId;
+    if (isNaN(numericPostId)) return;
+    
+    // Wait for posts to render, then scroll
+    setTimeout(() => {
+      const postElement = postRefs.current.get(numericPostId);
+      if (postElement) {
+        postElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Highlight the post briefly
+        postElement.style.transition = 'background-color 0.3s';
+        postElement.style.backgroundColor = 'rgba(255, 215, 0, 0.2)';
+        setTimeout(() => {
+          postElement.style.backgroundColor = '';
+          setTimeout(() => {
+            postElement.style.transition = '';
+          }, 300);
+        }, 2000);
+      }
+    }, 500);
+  };
+
+  // Check for postId query param and scroll to post
+  useEffect(() => {
+    const postIdParam = searchParams.get('postId');
+    if (postIdParam && posts.length > 0) {
+      scrollToPost(postIdParam);
+      // Clean up URL by removing query param after scrolling
+      const url = new URL(window.location.href);
+      url.searchParams.delete('postId');
+      window.history.replaceState({}, '', url.toString());
+    }
+  }, [posts, searchParams]);
 
   // Load posts from Supabase with fallback approach
   const loadPosts = async (tab: FeedTab = activeTab) => {
@@ -152,10 +191,11 @@ export default function FeedPage() {
       console.log("Unique user IDs:", userIds);
 
       // Step 4: Fetch profiles for these users (with timeout - 8 seconds)
+      // Include is_verified and role for verified badge
       const profilesQueryPromise = Promise.resolve(
         supabase
           .from('profiles')
-          .select('id, display_name')
+          .select('id, display_name, is_verified, role')
           .in('id', userIds)
       ) as Promise<{ data: any; error: any }>;
       
@@ -234,7 +274,11 @@ export default function FeedPage() {
         
         return {
           ...post,
-          profile: profile ? { display_name: (profile as any).display_name } : undefined,
+          profile: profile ? { 
+            display_name: (profile as any).display_name,
+            is_verified: (profile as any).is_verified,
+            role: (profile as any).role,
+          } : undefined,
           likes_count: postLikes.length,
           user_liked: postLikes.some((l: any) => l.user_id === user.id),
           comments_count: postComments.length,
@@ -516,28 +560,41 @@ export default function FeedPage() {
                 });
                 
                 return (
-                  <PostCard
+                  <div
                     key={post.id}
-                    postId={post.id}
-                    userId={post.user_id}
-                    username={post.profile?.display_name || "User"}
-                    avatar={getInitials(post.profile?.display_name, post.user_id)}
-                    timestamp={formatTimestamp(post.created_at)}
-                    content={post.content}
-                    imageUrl={post.image_url || undefined}
-                    likes={post.likes_count || 0}
-                    userLiked={post.user_liked || false}
-                    comments={post.comments_count || 0}
-                    onLikeToggle={loadPosts}
-                    onPostDeleted={() => {
-                      // Optimistic UI: Remove post immediately from state
-                      setPosts((prevPosts) => prevPosts.filter((p) => p.id !== post.id));
-                      // Then refresh to get accurate counts
-                      setTimeout(() => {
-                        loadPosts(activeTab);
-                      }, 100);
+                    ref={(el) => {
+                      if (el) {
+                        postRefs.current.set(post.id, el);
+                      } else {
+                        postRefs.current.delete(post.id);
+                      }
                     }}
-                  />
+                    data-post-id={post.id}
+                  >
+                    <PostCard
+                      postId={post.id}
+                      userId={post.user_id}
+                      username={post.profile?.display_name || "User"}
+                      avatar={getInitials(post.profile?.display_name, post.user_id)}
+                      timestamp={formatTimestamp(post.created_at)}
+                      content={post.content}
+                      imageUrl={post.image_url || undefined}
+                      likes={post.likes_count || 0}
+                      userLiked={post.user_liked || false}
+                      comments={post.comments_count || 0}
+                      onLikeToggle={loadPosts}
+                      onPostDeleted={() => {
+                        // Optimistic UI: Remove post immediately from state
+                        setPosts((prevPosts) => prevPosts.filter((p) => p.id !== post.id));
+                        // Then refresh to get accurate counts
+                        setTimeout(() => {
+                          loadPosts(activeTab);
+                        }, 100);
+                      }}
+                      authorVerified={post.profile?.is_verified}
+                      authorRole={post.profile?.role}
+                    />
+                  </div>
                 );
               })}
             </div>
@@ -546,5 +603,20 @@ export default function FeedPage() {
       </div>
       <MobileBottomNav />
     </main>
+  );
+}
+
+export default function FeedPage() {
+  return (
+    <Suspense fallback={
+      <main className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gold mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading feed...</p>
+        </div>
+      </main>
+    }>
+      <FeedPageContent />
+    </Suspense>
   );
 }
