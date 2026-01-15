@@ -84,11 +84,12 @@ export default function Navbar() {
                 </Link>
                 <Link
                   href="/search"
-                  className="px-2 md:px-4 py-2 text-gray-700 hover:text-gold transition-colors font-semibold"
+                  className="px-2 md:px-4 py-2 text-gray-700 hover:text-gold transition-colors font-semibold text-sm md:text-base"
                   title="Search Users"
                 >
+                  <span className="hidden sm:inline">{t('navbar.search') || 'Search'}</span>
                   <svg
-                    className="w-5 h-5"
+                    className="w-5 h-5 sm:hidden"
                     fill="none"
                     strokeLinecap="round"
                     strokeLinejoin="round"

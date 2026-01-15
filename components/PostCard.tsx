@@ -56,8 +56,10 @@ export default function PostCard({
   const [showComments, setShowComments] = useState(false);
   const [showDeleteMenu, setShowDeleteMenu] = useState(false);
   
-  // Check if current user is the post owner
+  // Check if current user is the post owner or admin
   const isPostOwner = user?.id === userId;
+  const isAdmin = user?.role === 'admin';
+  const canDelete = isPostOwner || isAdmin;
 
   const handleLike = async () => {
     if (!user || isLiking) return;
@@ -139,13 +141,13 @@ export default function PostCard({
    * Delete post and associated image from storage
    */
   const handleDelete = async () => {
-    if (!user || !isPostOwner) {
-      console.error("Delete attempted but user is not post owner");
+    if (!user || !canDelete) {
+      console.error("Delete attempted but user is not post owner or admin");
       return;
     }
     
     // Confirm dialog
-    const confirmed = window.confirm("Delete this post? This cannot be undone.");
+    const confirmed = window.confirm("Are you sure you want to delete this post?");
     if (!confirmed) {
       console.log("Delete cancelled by user");
       return;
@@ -191,11 +193,17 @@ export default function PostCard({
 
       // Step 2: Delete post from database
       console.log("Deleting DB row...");
-      const { error: deleteError, data: deleteData } = await supabase
+      let deleteQuery = supabase
         .from('posts')
         .delete()
-        .eq('id', postId)
-        .eq('user_id', user.id); // Extra security check
+        .eq('id', postId);
+      
+      // Only add user_id check if not admin (admin can delete any post)
+      if (!isAdmin) {
+        deleteQuery = deleteQuery.eq('user_id', user.id);
+      }
+      
+      const { error: deleteError, data: deleteData } = await deleteQuery;
 
       if (deleteError) {
         console.error("=== DELETE POST ERROR ===");
@@ -250,8 +258,8 @@ export default function PostCard({
           </div>
           <p className="text-sm text-gray-500">{timestamp}</p>
         </div>
-        {/* Delete Button - Only show for post owner */}
-        {isPostOwner && (
+        {/* Delete Button - Only show for post owner or admin */}
+        {canDelete && (
           <div className="relative flex-shrink-0" style={{ zIndex: 50 }}>
             <button
               onClick={(e) => {
@@ -302,22 +310,24 @@ export default function PostCard({
       <div className="p-4">
         <p className="text-gray-700 mb-4 whitespace-pre-wrap break-words">{content}</p>
         {imageUrl && isValidUrl(imageUrl) && (
-          <div className="rounded-xl overflow-hidden mb-4">
-            <img
-              src={imageUrl}
-              alt="Post content"
-              className="w-full h-auto"
-              onError={(e) => {
-                console.error("=== IMAGE LOAD ERROR ===");
-                console.error("Failed to load image URL:", imageUrl);
-                console.error("Image element:", e.target);
-                // Hide broken images
-                (e.target as HTMLImageElement).style.display = 'none';
-              }}
-              onLoad={() => {
-                console.log("✅ Image loaded successfully:", imageUrl);
-              }}
-            />
+          <div className="rounded-xl overflow-hidden mb-4 max-w-[520px] mx-auto">
+            <div className="aspect-[4/5] w-full bg-gray-100 rounded-xl overflow-hidden">
+              <img
+                src={imageUrl}
+                alt="Post content"
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  console.error("=== IMAGE LOAD ERROR ===");
+                  console.error("Failed to load image URL:", imageUrl);
+                  console.error("Image element:", e.target);
+                  // Hide broken images
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
+                onLoad={() => {
+                  console.log("✅ Image loaded successfully:", imageUrl);
+                }}
+              />
+            </div>
           </div>
         )}
       </div>

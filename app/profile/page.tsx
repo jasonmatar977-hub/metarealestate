@@ -259,9 +259,9 @@ export default function ProfilePage() {
       <Navbar />
       <div className="pt-24 pb-20 px-4">
         <div className="max-w-4xl mx-auto">
-          {/* Profile Header */}
+          {/* Profile Header - Combined with Account Information */}
           <div className="glass-dark rounded-2xl p-6 sm:p-8 mb-6">
-            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
+            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 mb-6">
               {/* Avatar */}
               <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full bg-gradient-to-r from-gold to-gold-light flex items-center justify-center text-gray-900 font-bold text-3xl sm:text-4xl flex-shrink-0">
                 {profile?.avatar_url && isValidUrl(profile.avatar_url) ? (
@@ -299,7 +299,7 @@ export default function ProfilePage() {
                 {profile?.bio && (
                   <p className="text-gray-700 mb-4 whitespace-pre-wrap">{profile.bio}</p>
                 )}
-                <div className="flex flex-wrap gap-4 justify-center sm:justify-start text-sm text-gray-600">
+                <div className="flex flex-wrap gap-4 justify-center sm:justify-start text-sm text-gray-600 mb-4">
                   {profile?.location && (
                     <div className="flex items-center gap-1">
                       <span>📍</span>
@@ -342,33 +342,53 @@ export default function ProfilePage() {
                 Edit Profile
               </Link>
             </div>
-          </div>
 
-          {/* Stats */}
-          <div className="glass-dark rounded-2xl p-6 mb-6">
-            <div className="flex justify-around text-center">
-              <div>
-                <div className="text-2xl font-bold text-gold-dark">{postsCount}</div>
-                <div className="text-sm text-gray-600">Posts</div>
+            {/* Stats */}
+            <div className="border-t border-gold/20 pt-6 mb-6">
+              <div className="flex justify-around text-center">
+                <div>
+                  <div className="text-2xl font-bold text-gold-dark">{postsCount}</div>
+                  <div className="text-sm text-gray-600">Posts</div>
+                </div>
+                {user && (
+                  <>
+                    <FollowersFollowingButton
+                      count={followersCount}
+                      label={t("profile.followers") || "Followers"}
+                      profileId={user.id}
+                      isOwnProfile={true}
+                      tab="followers"
+                    />
+                    <FollowersFollowingButton
+                      count={followingCount}
+                      label={t("profile.following") || "Following"}
+                      profileId={user.id}
+                      isOwnProfile={true}
+                      tab="following"
+                    />
+                  </>
+                )}
               </div>
-              {user && (
-                <>
-                  <FollowersFollowingButton
-                    count={followersCount}
-                    label={t("profile.followers") || "Followers"}
-                    profileId={user.id}
-                    isOwnProfile={true}
-                    tab="followers"
-                  />
-                  <FollowersFollowingButton
-                    count={followingCount}
-                    label={t("profile.following") || "Following"}
-                    profileId={user.id}
-                    isOwnProfile={true}
-                    tab="following"
-                  />
-                </>
-              )}
+            </div>
+
+            {/* Account Information - Moved into header section */}
+            <div className="border-t border-gold/20 pt-6">
+              <h2 className="font-orbitron text-lg font-bold text-gray-900 mb-4">Account Information</h2>
+              <div className="space-y-3 text-gray-700">
+                <div>
+                  <span className="font-semibold">Email:</span> {user?.email}
+                </div>
+                <div>
+                  <span className="font-semibold">Member since:</span>{' '}
+                  {profile?.created_at
+                    ? new Date(profile.created_at).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                      })
+                    : 'Recently'}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -380,59 +400,39 @@ export default function ProfilePage() {
                 <p className="text-gray-600">No posts yet. Start sharing!</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {userPosts.map((post) => (
-                  <PostCard
+                  <Link
                     key={post.id}
-                    postId={post.id}
-                    userId={post.user_id}
-                    username={displayName}
-                    avatar={getInitials(displayName, user?.id || '')}
-                    timestamp={formatTimestamp(post.created_at)}
-                    content={post.content}
-                    imageUrl={post.image_url || undefined}
-                    likes={0}
-                    userLiked={false}
-                    comments={0}
-                    onLikeToggle={() => {}}
-                    onPostDeleted={async () => {
-                      // Reload profile posts after deletion
-                      if (user) {
-                        const { data } = await supabase
-                          .from('posts')
-                          .select('*')
-                          .eq('user_id', user.id)
-                          .order('created_at', { ascending: false });
-                        if (data) {
-                          setUserPosts(data);
-                          setPostsCount(data.length);
-                        }
-                      }
-                    }}
-                  />
+                    href={`/feed?postId=${post.id}`}
+                    className="glass-dark rounded-xl overflow-hidden hover:shadow-lg transition-all group aspect-square"
+                  >
+                    {post.image_url && isValidUrl(post.image_url) ? (
+                      <div className="relative w-full h-full">
+                        <img
+                          src={post.image_url}
+                          alt={post.content || 'Post'}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                          }}
+                        />
+                        {post.content && (
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-4">
+                            <p className="text-white text-sm line-clamp-3">{post.content}</p>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="w-full h-full p-4 flex items-center justify-center">
+                        <p className="text-gray-600 text-sm line-clamp-4">{post.content || 'Post'}</p>
+                      </div>
+                    )}
+                  </Link>
                 ))}
               </div>
             )}
-          </div>
-
-          {/* Additional Info */}
-          <div className="glass-dark rounded-2xl p-6">
-            <h2 className="font-orbitron text-xl font-bold text-gray-900 mb-4">Account Information</h2>
-            <div className="space-y-3 text-gray-700">
-              <div>
-                <span className="font-semibold">Email:</span> {user?.email}
-              </div>
-              <div>
-                <span className="font-semibold">Member since:</span>{' '}
-                {profile?.created_at
-                  ? new Date(profile.created_at).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                    })
-                  : 'Recently'}
-              </div>
-            </div>
           </div>
         </div>
       </div>

@@ -17,6 +17,7 @@ import Link from "next/link";
 import { isValidUrl } from "@/lib/utils";
 import { withTimeout, normalizeSupabaseError, isAuthError } from "@/lib/asyncGuard";
 import EmojiPicker from "@/components/EmojiPicker";
+import VerifiedBadge from "@/components/VerifiedBadge";
 
 interface Message {
   id: string;
@@ -33,6 +34,8 @@ interface OtherUser {
   id: string;
   display_name: string | null;
   avatar_url: string | null;
+  is_verified?: boolean;
+  role?: string;
 }
 
 export default function ChatPage() {
@@ -139,11 +142,11 @@ export default function ChatPage() {
         return;
       }
 
-      // Step 2: Get other user's profile
+      // Step 2: Get other user's profile (include is_verified and role for verified badge)
       const profilePromise = Promise.resolve(
         supabase
           .from("profiles")
-          .select("id, display_name, avatar_url")
+          .select("id, display_name, avatar_url, is_verified, role")
           .eq("id", otherUserId)
           .single()
       ) as Promise<{ data: any; error: any }>;
@@ -171,11 +174,13 @@ export default function ChatPage() {
         return;
       }
 
-      setOtherUser({
-        id: otherUserProfile.id,
-        display_name: otherUserProfile.display_name,
-        avatar_url: otherUserProfile.avatar_url,
-      });
+        setOtherUser({
+          id: otherUserProfile.id,
+          display_name: otherUserProfile.display_name,
+          avatar_url: otherUserProfile.avatar_url,
+          is_verified: otherUserProfile.is_verified ?? false,
+          role: otherUserProfile.role ?? 'user',
+        });
 
       // Step 3: Load messages
       await loadMessages();
@@ -880,7 +885,14 @@ export default function ChatPage() {
                     {initials}
                   </div>
                 )}
-                <h2 className="font-semibold text-gray-900">{displayName}</h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="font-semibold text-gray-900">{displayName}</h2>
+                  <VerifiedBadge 
+                    isVerified={otherUser?.is_verified} 
+                    role={otherUser?.role}
+                    size="sm"
+                  />
+                </div>
               </div>
             )}
             <OnlineUsersMobilePill />
@@ -890,8 +902,7 @@ export default function ChatPage() {
         {/* Messages */}
         <div
           ref={messagesContainerRef}
-          className="flex-1 overflow-y-auto px-4 py-6"
-          style={{ maxHeight: "calc(100vh - 200px)" }}
+          className="flex-1 overflow-y-auto px-4 py-6 min-h-0"
         >
           <div className="max-w-2xl mx-auto space-y-4">
             {error && (

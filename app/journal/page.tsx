@@ -24,6 +24,7 @@ interface Area {
   last_updated: string;
   takeaway: string | null;
   user_id?: string | null;
+  created_at?: string;
 }
 
 export default function JournalHubPage() {
@@ -47,18 +48,36 @@ export default function JournalHubPage() {
     loadAreas();
   }, []);
 
+  // Reload areas when navigating back to this page (e.g., after creating a journal)
+  useEffect(() => {
+    const handleFocus = () => {
+      loadAreas();
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, []);
+
   const loadAreas = async () => {
     try {
       setIsLoadingAreas(true);
       setError(null);
 
-      // Try to fetch from database, fallback to seed data
+      // Fetch all journals from database, ordered by most recent first
       // Include user_id to check ownership (needed for edit/delete controls)
+      // Removed city filter to show all journals regardless of city value
       const { data, error: fetchError } = await supabase
         .from("area_journals")
-        .select("id, slug, name, city, status, last_updated, takeaway, user_id")
-        .eq("city", "beirut")
-        .order("name", { ascending: true });
+        .select("id, slug, name, city, status, last_updated, takeaway, user_id, created_at")
+        .order("created_at", { ascending: false });
+
+      // Dev-only logging
+      if (process.env.NODE_ENV !== 'production') {
+        if (fetchError) {
+          console.log("[Journal] Fetch error:", fetchError);
+        } else {
+          console.log("[Journal] Fetched journals count:", data?.length || 0);
+        }
+      }
 
       if (fetchError) {
         console.log("[Journal] Database fetch failed, using seed data:", fetchError);

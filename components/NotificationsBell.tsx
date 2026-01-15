@@ -413,16 +413,18 @@ export default function NotificationsBell() {
       {isOpen && (
         <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-xl shadow-2xl border-2 border-gold/20 overflow-hidden z-50 max-h-[500px] flex flex-col">
           {/* Header */}
-          <div className="px-4 py-3 border-b border-gold/20 flex items-center justify-between bg-gradient-to-r from-gold/10 to-gold-light/10">
-            <h3 className="font-bold text-gray-900">{t('notifications.title') || 'Notifications'}</h3>
-            {unreadCount > 0 && (
-              <button
-                onClick={handleMarkAllAsRead}
-                className="text-sm text-gold hover:text-gold-dark font-semibold"
-              >
-                {t('notifications.markAllRead') || 'Mark all as read'}
-              </button>
-            )}
+          <div className="px-4 py-3 border-b border-gold/20 bg-gradient-to-r from-gold/10 to-gold-light/10">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-bold text-gray-900">Notifications</h3>
+              {unreadCount > 0 && (
+                <button
+                  onClick={handleMarkAllAsRead}
+                  className="text-sm text-gold hover:text-gold-dark font-semibold"
+                >
+                  {t('notifications.markAllRead') || 'Mark all as read'}
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Notifications List */}
@@ -486,15 +488,15 @@ export default function NotificationsBell() {
             )}
           </div>
 
-          {/* Footer */}
+          {/* Footer - View All on its own row */}
           {notifications.length > 0 && (
-            <div className="px-4 py-2 border-t border-gold/20 text-center">
+            <div className="px-4 py-3 border-t border-gold/20">
               <Link
                 href="/notifications"
-                className="text-sm text-gold hover:text-gold-dark font-semibold"
+                className="block text-center text-sm text-gold hover:text-gold-dark font-semibold"
                 onClick={() => setIsOpen(false)}
               >
-                {t('notifications.viewAll') || 'View all notifications'}
+                {t('notifications.viewAll') || 'View All'}
               </Link>
             </div>
           )}

@@ -13,6 +13,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { findOrCreateDirectConversation } from "@/lib/messages";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { isValidUrl } from "@/lib/utils";
+import VerifiedBadge from "@/components/VerifiedBadge";
 
 interface UserWithPresence {
   id: string;
@@ -20,6 +21,8 @@ interface UserWithPresence {
   avatar_url: string | null;
   last_seen_at: string | null;
   is_online: boolean;
+  is_verified?: boolean;
+  role?: string;
 }
 
 interface OnlineUsersMobileSheetProps {
@@ -108,7 +111,7 @@ export default function OnlineUsersMobileSheet({
 
           const { data: profilesData, error: profilesError } = await supabase
             .from("profiles")
-            .select("id, display_name, avatar_url")
+            .select("id, display_name, avatar_url, is_verified, role")
             .in("id", followingIds);
 
           if (profilesError) {
@@ -141,6 +144,8 @@ export default function OnlineUsersMobileSheet({
                 avatar_url: profile?.avatar_url || null,
                 last_seen_at: lastSeen,
                 is_online: isOnline || false,
+                is_verified: profile?.is_verified ?? false,
+                role: profile?.role ?? 'user',
               };
             })
             .filter((u: UserWithPresence) => u.display_name !== null)
@@ -215,7 +220,7 @@ export default function OnlineUsersMobileSheet({
 
         const { data: profilesData } = await supabase
           .from("profiles")
-          .select("id, display_name, avatar_url")
+          .select("id, display_name, avatar_url, is_verified, role")
           .in("id", otherUserIds);
 
         const presenceMap = new Map(
@@ -242,6 +247,8 @@ export default function OnlineUsersMobileSheet({
               avatar_url: profile?.avatar_url || null,
               last_seen_at: lastSeen,
               is_online: isOnline || false,
+              is_verified: profile?.is_verified ?? false,
+              role: profile?.role ?? 'user',
             };
           })
           .filter((u) => u.display_name !== null)
@@ -451,9 +458,16 @@ export default function OnlineUsersMobileSheet({
 
                     {/* Name and status */}
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-gray-900 text-sm truncate">
-                        {displayName}
-                      </p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-semibold text-gray-900 text-sm truncate">
+                          {displayName}
+                        </p>
+                        <VerifiedBadge 
+                          isVerified={userProfile.is_verified} 
+                          role={userProfile.role}
+                          size="sm"
+                        />
+                      </div>
                       <p className="text-xs text-gray-600 truncate">
                         {userProfile.is_online
                           ? t("profile.online") || "Online"

@@ -258,8 +258,8 @@ export default function AreaDetailPage() {
     }
   };
 
-  // Check if current user can edit/delete this journal
-  const canEdit = user && journal && (journal.user_id === user.id || user.role === 'admin');
+  // Check if current user can edit/delete this journal (owner or admin, even if user_id is null)
+  const canEdit = user && journal && ((journal.user_id && journal.user_id === user.id) || user.role === 'admin');
 
   // Handle delete journal
   const handleDelete = async () => {
@@ -307,10 +307,10 @@ export default function AreaDetailPage() {
   return (
     <main className="min-h-screen pb-20">
       <Navbar />
-      <div className="pt-20 px-4 py-8">
+      <div className="pt-24 pb-20 px-4">
         <div className="max-w-4xl mx-auto">
           {/* Header */}
-          <div className="mb-8">
+          <div className="mb-8 mt-6">
             <Link
               href="/journal"
               className="text-gold hover:text-gold-dark font-semibold mb-4 inline-block"

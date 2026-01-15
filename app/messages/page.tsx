@@ -16,6 +16,7 @@ import OnlineUsersMobilePill from "@/components/OnlineUsersMobilePill";
 import Link from "next/link";
 import { isValidUrl } from "@/lib/utils";
 import { requestGuard, normalizeSupabaseError, isAuthError, debugLog, withTimeout, logSupabaseError } from "@/lib/asyncGuard";
+import VerifiedBadge from "@/components/VerifiedBadge";
 
 interface Conversation {
   id: string;
@@ -24,6 +25,8 @@ interface Conversation {
     id: string;
     display_name: string | null;
     avatar_url: string | null;
+    is_verified?: boolean;
+    role?: string;
   };
   lastMessage: {
     content: string;
@@ -278,17 +281,17 @@ export default function MessagesPage() {
         }
       }
 
-      // Batch load all profiles at once
-      const profileIds = Array.from(otherUserIds);
-      let profilesMap = new Map<string, any>();
-      
-      if (profileIds.length > 0) {
-        const profilesPromise = Promise.resolve(
-          supabase
-            .from("profiles")
-            .select("id, display_name, avatar_url")
-            .in("id", profileIds)
-        ) as Promise<{ data: any; error: any }>;
+        // Batch load all profiles at once (include is_verified and role for verified badges)
+        const profileIds = Array.from(otherUserIds);
+        let profilesMap = new Map<string, any>();
+        
+        if (profileIds.length > 0) {
+          const profilesPromise = Promise.resolve(
+            supabase
+              .from("profiles")
+              .select("id, display_name, avatar_url, is_verified, role")
+              .in("id", profileIds)
+          ) as Promise<{ data: any; error: any }>;
         
         const { data: profilesData, error: profilesError } = await withTimeout(
           profilesPromise,
@@ -391,6 +394,8 @@ export default function MessagesPage() {
             id: otherUserProfile.id,
             display_name: otherUserProfile.display_name,
             avatar_url: otherUserProfile.avatar_url,
+            is_verified: otherUserProfile.is_verified ?? false,
+            role: otherUserProfile.role ?? 'user',
           },
           lastMessage: lastMessage,
         });
@@ -604,10 +609,17 @@ export default function MessagesPage() {
 
                     {/* Conversation Info */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <h3 className="font-semibold text-gray-900 truncate">{displayName}</h3>
+                      <div className="flex items-center justify-between mb-1 gap-2">
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <h3 className="font-semibold text-gray-900 truncate">{displayName}</h3>
+                          <VerifiedBadge 
+                            isVerified={conv.otherUser.is_verified} 
+                            role={conv.otherUser.role}
+                            size="sm"
+                          />
+                        </div>
                         {lastMessageTime && (
-                          <span className="text-xs text-gray-500 flex-shrink-0 ml-2">
+                          <span className="text-xs text-gray-500 flex-shrink-0">
                             {lastMessageTime}
                           </span>
                         )}

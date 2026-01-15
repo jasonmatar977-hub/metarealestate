@@ -229,6 +229,371 @@ export default function AdminPage() {
     return userId.slice(0, 2).toUpperCase() || "U";
   };
 
+  // TODO: remove after presentation
+  // Seed demo data function
+  const seedDemoData = async () => {
+    if (!user || user.role !== 'admin') {
+      toast.error("Only admins can seed demo data");
+      return;
+    }
+
+    const confirmed = window.confirm("Are you sure you want to seed demo data? This will create 10 journals, 5 listings, and 6 posts.");
+    if (!confirmed) return;
+
+    try {
+      // 1. Create 10 area journals
+      const journals = [
+        {
+          slug: "hamra",
+          name: "Hamra",
+          city: "beirut",
+          status: "cooling" as const,
+          demand: "Student area with moderate demand. Rental market active but prices stabilizing.",
+          inventory_trend: "Increasing inventory as students graduate and move out.",
+          price_flexibility: "Sellers more willing to negotiate, especially for older buildings.",
+          rent_1br_min: 400,
+          rent_1br_max: 700,
+          rent_2br_min: 600,
+          rent_2br_max: 1000,
+          rent_3br_min: 900,
+          rent_3br_max: 1500,
+          sale_min: 1500,
+          sale_max: 2800,
+          driving_factors: ["Student population", "Proximity to AUB", "Affordable rents"],
+          risks: ["Seasonal fluctuations", "Older building stock"],
+          outlook: "sideways" as const,
+          what_would_change: "New university programs or infrastructure improvements could boost demand.",
+          methodology: "Based on rental listings, sales data, and local agent feedback over the past 6 months.",
+          takeaway: "Good value for students and young professionals. Negotiation room available.",
+          user_id: user.id,
+        },
+        {
+          slug: "verdun",
+          name: "Verdun",
+          city: "beirut",
+          status: "heating" as const,
+          demand: "High demand from families seeking quality residential areas with good schools.",
+          inventory_trend: "Limited inventory, especially for renovated units with parking.",
+          price_flexibility: "Sellers holding firm on pricing due to strong demand.",
+          rent_1br_min: 600,
+          rent_1br_max: 900,
+          rent_2br_min: 900,
+          rent_2br_max: 1400,
+          rent_3br_min: 1200,
+          rent_3br_max: 2000,
+          sale_min: 2200,
+          sale_max: 3500,
+          driving_factors: ["Family-friendly", "Quality schools", "Good infrastructure"],
+          risks: ["Price appreciation may slow", "Limited new construction"],
+          outlook: "up" as const,
+          what_would_change: "New school openings or major infrastructure projects could further increase demand.",
+          methodology: "Analysis of recent sales, rental trends, and family migration patterns.",
+          takeaway: "Strong investment potential for family-oriented properties. Prices rising steadily.",
+          user_id: user.id,
+        },
+        {
+          slug: "saifi",
+          name: "Saifi",
+          city: "beirut",
+          status: "stable" as const,
+          demand: "Luxury market with consistent high-end demand from expats and investors.",
+          inventory_trend: "Stable inventory with premium new developments entering market.",
+          price_flexibility: "Limited negotiation on premium properties.",
+          rent_1br_min: 1200,
+          rent_1br_max: 2000,
+          rent_2br_min: 1800,
+          rent_2br_max: 3000,
+          rent_3br_min: 2500,
+          rent_3br_max: 4500,
+          sale_min: 4000,
+          sale_max: 7000,
+          driving_factors: ["Luxury amenities", "Expat community", "Prime location"],
+          risks: ["Economic volatility", "High entry barrier"],
+          outlook: "sideways" as const,
+          what_would_change: "Major economic shifts or expat community changes could impact demand.",
+          methodology: "Tracking luxury property sales, expat rental patterns, and premium development launches.",
+          takeaway: "Premium market remains stable. Best for high-end investors and expats.",
+          user_id: user.id,
+        },
+        {
+          slug: "gemmayzeh",
+          name: "Gemmayzeh",
+          city: "beirut",
+          status: "heating" as const,
+          demand: "Trendy neighborhood attracting young professionals and creatives.",
+          inventory_trend: "Tight inventory, especially for renovated traditional buildings.",
+          price_flexibility: "Sellers firm on pricing due to high demand.",
+          rent_1br_min: 500,
+          rent_1br_max: 800,
+          rent_2br_min: 800,
+          rent_2br_max: 1200,
+          rent_3br_min: 1100,
+          rent_3br_max: 1800,
+          sale_min: 1800,
+          sale_max: 3200,
+          driving_factors: ["Nightlife", "Cultural scene", "Historic charm"],
+          risks: ["Gentrification concerns", "Limited parking"],
+          outlook: "up" as const,
+          what_would_change: "New cultural venues or infrastructure improvements could boost prices further.",
+          methodology: "Monitoring rental trends, sales activity, and neighborhood development projects.",
+          takeaway: "Hot market for young professionals. Prices rising, inventory tight.",
+          user_id: user.id,
+        },
+        {
+          slug: "mar-mikhael",
+          name: "Mar Mikhael",
+          city: "beirut",
+          status: "heating" as const,
+          demand: "Very high demand from young professionals and creatives. Inventory extremely tight.",
+          inventory_trend: "Very limited inventory. New listings sell/rent quickly.",
+          price_flexibility: "Minimal negotiation room. Sellers in strong position.",
+          rent_1br_min: 550,
+          rent_1br_max: 850,
+          rent_2br_min: 850,
+          rent_2br_max: 1300,
+          rent_3br_min: 1200,
+          rent_3br_max: 1900,
+          sale_min: 2000,
+          sale_max: 3500,
+          driving_factors: ["Trendy restaurants", "Art galleries", "Young professional appeal"],
+          risks: ["Overheating market", "Limited parking"],
+          outlook: "up" as const,
+          what_would_change: "Market saturation or infrastructure issues could slow growth.",
+          methodology: "Tracking rapid sales, rental competition, and neighborhood popularity metrics.",
+          takeaway: "Extremely competitive market. Properties move fast at premium prices.",
+          user_id: user.id,
+        },
+        {
+          slug: "achrafieh",
+          name: "Achrafieh",
+          city: "beirut",
+          status: "heating" as const,
+          demand: "High demand from expats, investors, and affluent locals.",
+          inventory_trend: "Limited quality inventory. Renovated units in high demand.",
+          price_flexibility: "Sellers holding firm, especially for premium properties.",
+          rent_1br_min: 700,
+          rent_1br_max: 1100,
+          rent_2br_min: 1100,
+          rent_2br_max: 1700,
+          rent_3br_min: 1500,
+          rent_3br_max: 2500,
+          sale_min: 2500,
+          sale_max: 4500,
+          driving_factors: ["Upscale amenities", "Expat community", "Quality infrastructure"],
+          risks: ["Price appreciation may slow", "Economic sensitivity"],
+          outlook: "up" as const,
+          what_would_change: "Economic stability or new premium developments could boost prices.",
+          methodology: "Analysis of expat rental patterns, investment sales, and premium property trends.",
+          takeaway: "Strong investment area. Premium properties command top prices.",
+          user_id: user.id,
+        },
+        {
+          slug: "downtown",
+          name: "Downtown",
+          city: "beirut",
+          status: "stable" as const,
+          demand: "Steady demand from businesses and high-end residents.",
+          inventory_trend: "Stable inventory with occasional premium developments.",
+          price_flexibility: "Moderate negotiation room on older properties.",
+          rent_1br_min: 1000,
+          rent_1br_max: 1800,
+          rent_2br_min: 1600,
+          rent_2br_max: 2800,
+          rent_3br_min: 2200,
+          rent_3br_max: 4000,
+          sale_min: 3500,
+          sale_max: 6000,
+          driving_factors: ["Business district", "Prime location", "Premium developments"],
+          risks: ["Economic sensitivity", "High maintenance costs"],
+          outlook: "sideways" as const,
+          what_would_change: "Major business relocations or economic shifts could impact demand.",
+          methodology: "Tracking commercial and residential sales, rental stability, and business activity.",
+          takeaway: "Premium location with stable pricing. Best for business-oriented investors.",
+          user_id: user.id,
+        },
+        {
+          slug: "badaro",
+          name: "Badaro",
+          city: "beirut",
+          status: "heating" as const,
+          demand: "Growing demand from families and professionals seeking value.",
+          inventory_trend: "Increasing interest, inventory starting to tighten.",
+          price_flexibility: "Some negotiation room, but decreasing as demand grows.",
+          rent_1br_min: 450,
+          rent_1br_max: 750,
+          rent_2br_min: 700,
+          rent_2br_max: 1100,
+          rent_3br_min: 1000,
+          rent_3br_max: 1600,
+          sale_min: 1600,
+          sale_max: 2800,
+          driving_factors: ["Value proposition", "Family-friendly", "Upcoming development"],
+          risks: ["Infrastructure needs", "Gentrification pace"],
+          outlook: "up" as const,
+          what_would_change: "Infrastructure improvements or new developments could accelerate growth.",
+          methodology: "Monitoring sales growth, rental trends, and neighborhood development plans.",
+          takeaway: "Emerging area with good value. Prices rising as area develops.",
+          user_id: user.id,
+        },
+        {
+          slug: "koraytem",
+          name: "Koraytem",
+          city: "beirut",
+          status: "stable" as const,
+          demand: "Moderate demand from families and professionals.",
+          inventory_trend: "Stable inventory with occasional new listings.",
+          price_flexibility: "Reasonable negotiation room available.",
+          rent_1br_min: 500,
+          rent_1br_max: 800,
+          rent_2br_min: 800,
+          rent_2br_max: 1200,
+          rent_3br_min: 1100,
+          rent_3br_max: 1700,
+          sale_min: 1800,
+          sale_max: 3000,
+          driving_factors: ["Residential appeal", "Good location", "Reasonable prices"],
+          risks: ["Limited new development", "Infrastructure aging"],
+          outlook: "sideways" as const,
+          what_would_change: "New developments or infrastructure upgrades could boost demand.",
+          methodology: "Tracking sales and rental activity, neighborhood stability metrics.",
+          takeaway: "Stable residential area with reasonable prices. Good for families.",
+          user_id: user.id,
+        },
+        {
+          slug: "ain-el-mreisse",
+          name: "Ain El Mreisse",
+          city: "beirut",
+          status: "stable" as const,
+          demand: "Steady demand from residents seeking coastal access.",
+          inventory_trend: "Stable inventory with coastal properties in demand.",
+          price_flexibility: "Moderate negotiation, especially for non-coastal units.",
+          rent_1br_min: 600,
+          rent_1br_max: 900,
+          rent_2br_min: 900,
+          rent_2br_max: 1400,
+          rent_3br_min: 1300,
+          rent_3br_max: 2100,
+          sale_min: 2000,
+          sale_max: 3500,
+          driving_factors: ["Coastal location", "Residential appeal", "Stable market"],
+          risks: ["Limited new development", "Coastal property premium"],
+          outlook: "sideways" as const,
+          what_would_change: "Coastal development projects or infrastructure improvements could impact prices.",
+          methodology: "Monitoring coastal property sales, rental trends, and development activity.",
+          takeaway: "Stable coastal area. Coastal properties command premium, inland more affordable.",
+          user_id: user.id,
+        },
+      ];
+
+      const { error: journalsError } = await supabase
+        .from("area_journals")
+        .insert(journals);
+
+      if (journalsError) {
+        console.error("[Seed] Error creating journals:", journalsError);
+        toast.error(`Failed to create journals: ${journalsError.message}`);
+        return;
+      }
+
+      // 2. Create 5 demo listings
+      const listings = [
+        {
+          user_id: user.id,
+          title: "Luxury 3BR Apartment in Achrafieh",
+          description: "Beautifully renovated 3-bedroom apartment in prime Achrafieh location. Features modern kitchen, spacious living area, and balcony with city views. Perfect for families or professionals. 180 sqm, 2 bathrooms, parking included.",
+          price: 450000,
+          city: "Beirut",
+          image_urls: [],
+        },
+        {
+          user_id: user.id,
+          title: "Modern 2BR in Mar Mikhael",
+          description: "Trendy 2-bedroom apartment in the heart of Mar Mikhael. Walking distance to restaurants, cafes, and art galleries. Recently renovated with modern finishes. 120 sqm, 1 bathroom.",
+          price: 320000,
+          city: "Beirut",
+          image_urls: [],
+        },
+        {
+          user_id: user.id,
+          title: "Family Home in Verdun",
+          description: "Spacious 4-bedroom family home in Verdun. Quiet residential area with good schools nearby. Large living spaces, garden, and parking included. 250 sqm, 3 bathrooms.",
+          price: 580000,
+          city: "Beirut",
+          image_urls: [],
+        },
+        {
+          user_id: user.id,
+          title: "Studio Apartment in Hamra",
+          description: "Cozy studio apartment perfect for students or young professionals. Located near AUB, with easy access to public transport and amenities. 35 sqm, 1 bathroom.",
+          price: 95000,
+          city: "Beirut",
+          image_urls: [],
+        },
+        {
+          user_id: user.id,
+          title: "Premium Penthouse in Downtown",
+          description: "Luxury penthouse with stunning city and sea views. High-end finishes, premium amenities, and concierge service. Ideal for executives or investors. 300 sqm, 3 bedrooms, 3 bathrooms.",
+          price: 1200000,
+          city: "Beirut",
+          image_urls: [],
+        },
+      ];
+
+      const { error: listingsError } = await supabase
+        .from("listings")
+        .insert(listings);
+
+      if (listingsError) {
+        console.error("[Seed] Error creating listings:", listingsError);
+        toast.error(`Failed to create listings: ${listingsError.message}`);
+        return;
+      }
+
+      // 3. Create 6 professional posts
+      const posts = [
+        {
+          user_id: user.id,
+          content: "📊 Market Update: Beirut real estate shows strong resilience in Q4 2024. Premium areas like Achrafieh and Downtown maintain stable pricing, while emerging neighborhoods like Badaro show promising growth. Investment opportunities remain strong for verified buyers.",
+        },
+        {
+          user_id: user.id,
+          content: "💡 Investment Tip: When evaluating properties in Beirut, consider proximity to universities, business districts, and infrastructure projects. Areas near planned metro stations or new developments often see 15-25% appreciation over 3-5 years.",
+        },
+        {
+          user_id: user.id,
+          content: "🏙️ Beirut Real Estate Insight: The rental yield in prime areas averages 4-6% annually, making real estate an attractive investment compared to traditional savings. Properties in student areas like Hamra offer higher yields (6-8%) but require more management.",
+        },
+        {
+          user_id: user.id,
+          content: "📈 Pricing Trends: We're seeing a shift toward quality over quantity. Buyers are willing to pay premium for renovated units with modern amenities, parking, and good infrastructure. Unrenovated properties are taking longer to sell unless priced competitively.",
+        },
+        {
+          user_id: user.id,
+          content: "💰 Rental Yield Advice: For investors seeking rental income, focus on 1-2 bedroom units in areas with high demand (Mar Mikhael, Gemmayzeh, Hamra). These typically rent faster and offer better yields than larger family units in quieter areas.",
+        },
+        {
+          user_id: user.id,
+          content: "📋 Buyer Guide: Before purchasing in Beirut, verify property ownership, check for any liens or disputes, and ensure proper documentation. Work with verified agents and consider areas with good infrastructure and growth potential. Always inspect the property thoroughly.",
+        },
+      ];
+
+      const { error: postsError } = await supabase
+        .from("posts")
+        .insert(posts);
+
+      if (postsError) {
+        console.error("[Seed] Error creating posts:", postsError);
+        toast.error(`Failed to create posts: ${postsError.message}`);
+        return;
+      }
+
+      toast.success("Demo data seeded successfully! Created 10 journals, 5 listings, and 6 posts.");
+    } catch (error: any) {
+      console.error("[Seed] Exception seeding demo data:", error);
+      toast.error(`Failed to seed demo data: ${error?.message || 'Unknown error'}`);
+    }
+  };
+
   // Show loading state while checking access
   if (loadingSession || isLoading) {
     return (
@@ -428,6 +793,23 @@ export default function AdminPage() {
               Showing {filteredUsers.length} of {users.length} users
             </div>
           )}
+
+          {/* TODO: remove after presentation */}
+          {/* Seed Demo Data Section */}
+          <div className="mt-12 glass-dark rounded-2xl p-6 border-2 border-amber-300">
+            <h2 className="font-orbitron text-xl font-bold text-gray-900 mb-4">
+              Demo Data Seeder
+            </h2>
+            <p className="text-gray-600 text-sm mb-4">
+              Create demo content for presentation: 10 journals, 5 listings, 6 posts
+            </p>
+            <button
+              onClick={seedDemoData}
+              className="px-6 py-3 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-bold rounded-xl hover:shadow-lg transition-all"
+            >
+              Seed Demo Data
+            </button>
+          </div>
         </div>
       </div>
       <Footer />
